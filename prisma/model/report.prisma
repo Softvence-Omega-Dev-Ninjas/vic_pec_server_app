@@ -1,0 +1,44 @@
+model Report {
+  id                String         @id @default(uuid())
+  reportId          String         @unique // e.g., "REP-001"
+  
+  // Report Status
+  status            ReportStatus   @default(UNREAD)
+  priority          PriorityLevel  @default(MEDIUM)
+  
+  // Report Content
+  reason            String        
+  subject           String        
+  description       String         @db.Text
+  
+  // Reporter Information
+  reporterName      String
+  reporterEmail     String
+
+  reporterId        String?
+  reporter          User?          @relation("UserReports", fields: [reporterId], references: [id])
+
+  // polymorphic-like relations
+  canineId          String?
+  canine            Canine?        @relation("CanineReports", fields: [canineId], references: [id], onDelete: Cascade)
+  
+  litterId          String?
+  litter            Litter?        @relation("LitterReports", fields: [litterId], references: [id], onDelete: Cascade)
+
+  createdAt         DateTime       @default(now()) // Report Date
+  updatedAt         DateTime       @updatedAt
+
+  @@map("reports")
+}
+
+enum ReportStatus {
+  UNREAD
+  READ
+  RESOLVED
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+}

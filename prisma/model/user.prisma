@@ -1,0 +1,101 @@
+model User {
+  id                    String              @id @default(uuid())
+  email                 String              @unique
+  password              String
+  phoneNumber           String?
+  ownershipTransferCode String?
+  fullName              String?
+  about                 String?             @db.Text
+  isVerified            Boolean             @default(false)
+  city                  String
+  state                 String
+  zipCode               String
+  country               String
+
+  // Profile Media
+  profileImage          Image?              @relation("UserProfileImage")
+  coverImage            Image?              @relation("UserCoverImage")
+
+  // Settings
+  emailNotifications    Boolean             @default(true)
+  showOwnerId           Boolean             @default(false)
+
+  // Ownership Transfers
+  sentTransfers         OwnershipTransfer[] @relation("SentTransfers")
+  receivedTransfers     OwnershipTransfer[] @relation("ReceivedTransfers")
+
+  // Membership & Role
+  membershipId          String
+  membership            Membership          @relation(fields: [membershipId], references: [id])
+  roleType              RoleType            @default(USER)
+  permissions           AccessPermission[]
+
+  // Relation to Canine & Litter
+  canines               Canine[]            @relation("UserCanines")
+  ownedLitters          Litter[]            @relation("LitterOwner")
+
+  reportedIssues Report[] @relation("UserReports")
+
+  lastLogin             DateTime?           @default(now())
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@map("users")
+}
+
+
+enum RoleType {
+  USER
+  OWNER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ResourceType {
+  USER
+  CANINE
+  CERTIFICATE
+  REPORT
+  TRANSFER_OWNERSHIP
+}
+
+model AccessPermission {
+  id          String         @id @default(uuid())
+  name        String         @unique 
+  description String?        
+  
+  resources   ResourceType[] 
+  
+  canView     Boolean        @default(false)
+  canCreate   Boolean        @default(false)
+  canEdit     Boolean        @default(false)
+  canDelete   Boolean        @default(false)
+
+  users       User[]
+
+  @@map("access_permissions")
+}
+
+model Membership {
+  id                    String   @id @default(uuid())
+  tier                  String   @unique 
+  price                 Float    @default(0)
+  
+  canineLimit           Int      @default(1)
+  canineLimitLabel      String   @default("Initial Canine Registration(s)")
+
+  standardPricing       Boolean  @default(true)
+  pricingLabel          String   @default("Standard Pricing on PCR Registration Certificates & Pedigrees")
+
+  freeLitterReg         Boolean  @default(false)
+  litterRegLabel        String   @default("Standard Litter Registration & Canine Transfer Fees")
+
+  freeDigitalDownloads  Boolean  @default(false)
+  digitalDownloadsLabel String?  
+
+  directAssistance      Boolean  @default(false)
+  assistanceLabel       String?  
+
+  users                 User[]
+  @@map("memberships")
+}
