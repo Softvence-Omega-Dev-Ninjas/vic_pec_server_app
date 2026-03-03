@@ -1,0 +1,40 @@
+model Image {
+  id            String   @id @default(uuid())
+  url           String   
+  publicId      String  
+  isPrimary     Boolean  @default(false)
+
+  // Canine Connection
+  canineId  String?
+  canine    Canine?  @relation("CanineImages", fields: [canineId], references: [id], onDelete: Cascade)
+
+  litterId  String?
+  litter    Litter?  @relation("LitterImages", fields: [litterId], references: [id])
+
+  // User Connection
+  userProfileId String?  @unique
+  userProfile   User?    @relation("UserProfileImage", fields: [userProfileId], references: [id])
+  
+  userCoverId   String?  @unique
+  userCover     User?    @relation("UserCoverImage", fields: [userCoverId], references: [id])
+
+  createdAt     DateTime @default(now())
+  @@map("images")
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  url       String
+  publicId  String
+  isPrimary Boolean  @default(false)
+
+  litterId  String?
+  litter    Litter?  @relation("LitterDocuments", fields: [litterId], references: [id])
+
+  // Canine Relation (NAM ADD KORA HOYECHE)
+  canineId  String?
+  canine    Canine?  @relation("CanineDocuments", fields: [canineId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  @@map("documents")
+}

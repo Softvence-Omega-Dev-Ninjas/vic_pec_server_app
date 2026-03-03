@@ -1,0 +1,51 @@
+model Canine {
+  id                String              @id @default(uuid())
+  pcrId             String              @unique // Unique PCR ID is mandatory for relation
+  name              String
+  breed             String
+  gender            Gender
+  dateOfBirth       DateTime
+  color             String
+  weight            Float?
+  city              String
+  state             String
+  zipCode           String
+  country           String
+  microchipId       String?             @unique
+  primaryBreedDNA   String?
+  secondaryBreedDNA String?
+  healthStatus      String              @default("Excellent")
+  vaccinations      VaccinationType[]
+  healthClearances  HealthClearance[]
+  healthNotes       String?             @db.Text
+
+  images            Image[]             @relation("CanineImages")
+  DNAdocuments      Document[]          @relation("CanineDocuments")
+  transfers         OwnershipTransfer[] @relation("CanineTransfers")
+
+  // Owner Relation
+  ownerId           String
+  owner             User                @relation("UserCanines", fields: [ownerId], references: [id])
+
+  // Litter Relation
+  litterId          String?
+  litter            Litter?             @relation("LitterPuppies", fields: [litterId], references: [id], onDelete: Cascade)
+
+  // Pedigree History
+  asMother          Litter[]            @relation("MotherRelation")
+  asFather          Litter[]            @relation("FatherRelation")
+
+  reports     Report[] @relation("CanineReports")
+
+
+  requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
+  status            CertificateRequestStatus       @default(PENDING) 
+  assignedTier      VerificationType    @default(NONE)  
+
+  certificateRequests CertificateRequest[] @relation("CanineCertRequests") 
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@map("canines")
+}

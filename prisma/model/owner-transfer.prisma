@@ -1,0 +1,25 @@
+model OwnershipTransfer {
+  id              String         @id @default(uuid())
+  transferCode    String         @unique
+  
+  canineId        String?        
+  canine          Canine?        @relation("CanineTransfers", fields: [canineId], references: [id])
+
+  litterId        String?
+  litter          Litter?        @relation("LitterTransfers", fields: [litterId], references: [id])
+
+  currentOwnerId  String
+  currentOwner    User           @relation("SentTransfers", fields: [currentOwnerId], references: [id])
+
+  newOwnerId      String?        
+  newOwner        User?          @relation("ReceivedTransfers", fields: [newOwnerId], references: [id])
+
+  status          TransferOwnershipStatus @default(PENDING)
+  expiresAt       DateTime     
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@map("ownership_transfers")
+}
+

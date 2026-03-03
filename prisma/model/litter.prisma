@@ -1,0 +1,51 @@
+model Litter {
+  id                String            @id @default(uuid())
+
+  pcrId             String            @unique // Unique PCR ID for the Litter
+  name              String
+  breed             String
+  gender            Gender
+  dateOfBirth       DateTime
+
+  color             String
+  weight            Float?
+
+  city              String
+  state             String
+  zipCode           String
+  country           String
+  microchipId       String?           @unique
+  healthStatus      String            @default("Excellent")
+  vaccinations      VaccinationType[]
+  healthClearances  HealthClearance[]
+  healthNotes       String?           @db.Text
+
+  images            Image[]             @relation("LitterImages")
+  DNAdocuments      Document[]          @relation("LitterDocuments")
+  transfers         OwnershipTransfer[] @relation("LitterTransfers")
+
+  motherPcrId       String?
+  mother            Canine?           @relation("MotherRelation", fields: [motherPcrId], references: [pcrId])
+  fatherPcrId       String?
+  father            Canine?           @relation("FatherRelation", fields: [fatherPcrId], references: [pcrId])
+
+  // User Relations (Fixed Ambiguity)
+  ownerId           String
+  owner             User              @relation("LitterOwner", fields: [ownerId], references: [id])
+
+  reports     Report[] @relation("LitterReports")
+
+  requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
+  status            CertificateRequestStatus       @default(PENDING)
+  assignedTier      VerificationType    @default(NONE)  
+
+  certificateRequests CertificateRequest[] @relation("LitterCertRequests") 
+
+  // Puppies registered in this litter session
+  puppies           Canine[]          @relation("LitterPuppies")
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@map("litters")
+}
