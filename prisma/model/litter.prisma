@@ -35,9 +35,11 @@ model Litter {
 
   reports     Report[] @relation("LitterReports")
 
-  requestType       RequestType         @default(NEW_REGISTRATION)
-  status            RequestStatus       @default(PENDING)
-  assignedTier      VerificationType    @default(NONE)   
+  requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
+  status            CertificateRequestStatus       @default(PENDING)
+  assignedTier      VerificationType    @default(NONE)  
+
+  certificateRequests CertificateRequest[] @relation("LitterCertRequests") 
 
   // Puppies registered in this litter session
   puppies           Canine[]          @relation("LitterPuppies")

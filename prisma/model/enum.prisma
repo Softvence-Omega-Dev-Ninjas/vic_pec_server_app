@@ -1,0 +1,89 @@
+
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum VaccinationType {
+  RABIES
+  DHPP
+  BORDETELLA
+  LEPTOSPIROSIS
+  LYME
+  INFLUENZA
+}
+
+enum HealthClearance {
+  HIP_DYSPLASIA
+  ELBOW_CLEAR
+  EYE_CLEARANCE_CERF
+  HEART_CLEARANCE
+  PRA_CLEAR
+  DM_CLEAR
+}
+
+
+enum RegistrationRequestType {
+  NEW_REGISTRATION
+  TIER_UPGRADE
+  DNA_RETEST
+}
+
+
+enum VerificationType {
+  GOLD
+  SILVER
+  NONE
+}
+
+
+
+enum CertificateRequestStatus {
+  PENDING
+  APPROVED
+  DECLINE
+  UNDER_REVIEW
+}
+
+enum CertificateType {
+  CERTIFICATE
+  PEDIGREE
+}
+
+enum TransferOwnershipStatus {
+  PENDING
+  SUCCESSFUL 
+  FAILED    
+  EXPIRED   
+}
+
+
+enum ReportStatus {
+  UNREAD
+  READ
+  RESOLVED
+}
+
+enum PriorityLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+
+
+enum RoleType {
+  USER
+  OWNER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum ResourceType {
+  USER
+  CANINE
+  CERTIFICATE
+  REPORT
+  TRANSFER_OWNERSHIP
+}

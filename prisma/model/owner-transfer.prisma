@@ -14,7 +14,7 @@ model OwnershipTransfer {
   newOwnerId      String?        
   newOwner        User?          @relation("ReceivedTransfers", fields: [newOwnerId], references: [id])
 
-  status          TransferStatus @default(PENDING)
+  status          TransferOwnershipStatus @default(PENDING)
   expiresAt       DateTime     
   
   createdAt       DateTime       @default(now())
@@ -23,9 +23,3 @@ model OwnershipTransfer {
   @@map("ownership_transfers")
 }
 
-enum TransferStatus {
-  PENDING
-  SUCCESSFUL 
-  FAILED    
-  EXPIRED   
-}

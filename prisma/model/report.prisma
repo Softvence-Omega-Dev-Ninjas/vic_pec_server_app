@@ -31,14 +31,3 @@ model Report {
   @@map("reports")
 }
 
-enum ReportStatus {
-  UNREAD
-  READ
-  RESOLVED
-}
-
-enum PriorityLevel {
-  LOW
-  MEDIUM
-  HIGH
-}

@@ -36,6 +36,8 @@ model User {
 
   reportedIssues Report[] @relation("UserReports")
 
+  certificateRequests CertificateRequest[] @relation("UserCertRequests")
+
   lastLogin             DateTime?           @default(now())
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
@@ -43,21 +45,6 @@ model User {
   @@map("users")
 }
 
-
-enum RoleType {
-  USER
-  OWNER
-  ADMIN
-  SUPER_ADMIN
-}
-
-enum ResourceType {
-  USER
-  CANINE
-  CERTIFICATE
-  REPORT
-  TRANSFER_OWNERSHIP
-}
 
 model AccessPermission {
   id          String         @id @default(uuid())

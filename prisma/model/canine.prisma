@@ -38,55 +38,14 @@ model Canine {
   reports     Report[] @relation("CanineReports")
 
 
-  requestType       RequestType         @default(NEW_REGISTRATION)
-  status            RequestStatus       @default(PENDING) 
-  assignedTier      VerificationType    @default(NONE)   
+  requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
+  status            CertificateRequestStatus       @default(PENDING) 
+  assignedTier      VerificationType    @default(NONE)  
+
+  certificateRequests CertificateRequest[] @relation("CanineCertRequests") 
 
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
 
   @@map("canines")
-}
-
-
-enum Gender {
-  MALE
-  FEMALE
-}
-
-enum VaccinationType {
-  RABIES
-  DHPP
-  BORDETELLA
-  LEPTOSPIROSIS
-  LYME
-  INFLUENZA
-}
-
-enum HealthClearance {
-  HIP_DYSPLASIA
-  ELBOW_CLEAR
-  EYE_CLEARANCE_CERF
-  HEART_CLEARANCE
-  PRA_CLEAR
-  DM_CLEAR
-}
-
-
-enum RequestType {
-  NEW_REGISTRATION
-  TIER_UPGRADE
-  DNA_RETEST
-}
-
-enum RequestStatus {
-  PENDING
-  UNDER_REVIEW
-  APPROVE
-  DECLINE
-}
-enum VerificationType {
-  GOLD
-  SILVER
-  NONE
 }

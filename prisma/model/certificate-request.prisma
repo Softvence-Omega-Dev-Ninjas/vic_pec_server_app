@@ -1,0 +1,25 @@
+model CertificateRequest {
+  id              String          @id @default(uuid())
+  requestId       String          @unique // e.g., "CERT-001"
+  
+  // Relation to Owner
+  ownerId         String
+  owner           User            @relation("UserCertRequests", fields: [ownerId], references: [id])
+
+  // Optional Relations: Ekshathe duiti thakbe na, jekono ekti thakbe
+  canineId        String?
+  canine          Canine?         @relation("CanineCertRequests", fields: [canineId], references: [id])
+  
+  litterId        String?
+  litter          Litter?         @relation("LitterCertRequests", fields: [litterId], references: [id])
+
+  certificateType CertificateType @default(CERTIFICATE)
+  requestDate     DateTime        @default(now())
+  issuedDate      DateTime?       // Approved hole date thakbe
+  status          CertificateRequestStatus   @default(PENDING)
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@map("certificate_requests")
+}
