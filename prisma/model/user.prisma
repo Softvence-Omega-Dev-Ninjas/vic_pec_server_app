@@ -1,16 +1,31 @@
 model User {
   id                    String              @id @default(uuid())
   email                 String              @unique
+
+  pcrId            String   @unique // e.g., PCR-OW0001-123456
+  
+  pcrPrefix        String   // 'OW' or 'PA'
+  pcrIncremental   String   // '0001'
+  pcrRandom        String   // '123456'
+
+
   password              String
   phoneNumber           String?
   ownershipTransferCode String?
+
+  otp             String?   
+  otpExpires      DateTime?
+  otpAttempts     Int       @default(0)  
+  otpLockUntil    DateTime?
+
   fullName              String?
   about                 String?             @db.Text
   isVerified            Boolean             @default(false)
-  city                  String
-  state                 String
-  zipCode               String
-  country               String
+  city                  String?
+  state                 String?
+  zipCode               String?
+  country               String?
+  status    UserStatus @default(PENDING)
 
   // Profile Media
   profileImage          Image?              @relation("UserProfileImage")
@@ -25,8 +40,8 @@ model User {
   receivedTransfers     OwnershipTransfer[] @relation("ReceivedTransfers")
 
   // Membership & Role
-  membershipId          String
-  membership            Membership          @relation(fields: [membershipId], references: [id])
+  membershipId          String?
+  membership            Membership?          @relation(fields: [membershipId], references: [id])
   roleType              RoleType            @default(USER)
   permissions           AccessPermission[]
 

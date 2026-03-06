@@ -1,28 +1,17 @@
+version: '3.8'
 services:
   db:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: vic-pec-db
     restart: always
     environment:
-      POSTGRES_USER: vic-pec
-      POSTGRES_PASSWORD: vic-pec
-      POSTGRES_DB: vic_pec_db
+      POSTGRES_USER: vicpec
+      POSTGRES_PASSWORD: vicpec_password
+      POSTGRES_DB: vicpec_db
     ports:
-      - "5435:5432"
+      - "5438:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: vic-pec-pgadmin
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@vicpec.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
-    depends_on:
-      - db
+      - vicpec_postgres_data:/var/lib/postgresql/data
 
 volumes:
-  postgres_data:
+  vicpec_postgres_data:

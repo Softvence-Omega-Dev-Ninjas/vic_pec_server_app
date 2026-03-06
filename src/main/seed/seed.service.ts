@@ -1,11 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ResourceType, RoleType } from 'generated/prisma/enums';
+// import { ResourceType, RoleType } from '@prisma/client';
 
 @Injectable()
 export class SeedService implements OnModuleInit {
@@ -14,12 +16,30 @@ export class SeedService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.seedMemberships();
-    const adminPermissions = await this.seedAccessPermissions();
-    await this.seedSuperAdmin(adminPermissions);
-  }
+    try {
+      this.logger.log('🌱 Starting Seeding process...');
 
-  // 1. Memberships Seed (Exact Figma Tiers & Features)
+      const foundationalMembership = await this.seedMemberships();
+      if (!foundationalMembership) {
+        throw new Error('❌ Foundational membership seeding returned null.');
+      }
+
+      const adminPermissions = await this.seedAccessPermissions();
+      if (!adminPermissions) {
+        throw new Error('❌ Admin permissions seeding returned null.');
+      }
+
+      await this.seedSuperAdmin(foundationalMembership.id, adminPermissions.id);
+
+      // 4. Seed Breeds
+      await this.seedBreeds();
+
+      this.logger.log('✅ Seeding completed successfully.');
+    } catch (error: any) {
+      this.logger.error('❌ Seeding failed detailed message:', error.message);
+    }
+  }
+  // 1. Memberships Seed
   async seedMemberships() {
     const tiers = [
       {
@@ -30,7 +50,6 @@ export class SeedService implements OnModuleInit {
         pricingLabel:
           'Standard Pricing on PCR Registration Certificates & Pedigrees',
         litterRegLabel: 'Standard Litter Registration & Canine Transfer Fees',
-        // Figma features/booleans
         freeLitterReg: false,
         freeDigitalDownloads: false,
         directAssistance: false,
@@ -45,7 +64,6 @@ export class SeedService implements OnModuleInit {
           'Discounted Litter Registrations & Canine Transfer Fees',
         digitalDownloadsLabel:
           'Free Digital Downloads of Certificates & Pedigrees',
-        // Figma features/booleans
         freeLitterReg: false,
         freeDigitalDownloads: true,
         directAssistance: false,
@@ -60,7 +78,6 @@ export class SeedService implements OnModuleInit {
         litterRegLabel: 'Free Litter Registrations & Canine Transfers',
         digitalDownloadsLabel: "Access to PCR's Private PA Communication Group",
         assistanceLabel: 'Direct PA Assistance',
-        // Figma features/booleans
         freeLitterReg: true,
         freeDigitalDownloads: true,
         directAssistance: true,
@@ -70,11 +87,15 @@ export class SeedService implements OnModuleInit {
     for (const t of tiers) {
       await this.prisma.membership.upsert({
         where: { tier: t.tier },
-        update: t, // Figma-r text change holeo jate database update hoy
+        update: t,
         create: t,
       });
     }
-    this.logger.log('✅ Figma Pricing Tiers seeded successfully.');
+    this.logger.log('✅ Membership Tiers seeded.');
+
+    return await this.prisma.membership.findUnique({
+      where: { tier: 'FOUNDATIONAL' },
+    });
   }
 
   // 2. Access Permissions Seed
@@ -94,40 +115,436 @@ export class SeedService implements OnModuleInit {
         canDelete: true,
       },
     });
+    this.logger.log('✅ Permissions seeded.');
     return fullAccess;
   }
 
   // 3. Super Admin Seed
-  async seedSuperAdmin(permission: any) {
+  async seedSuperAdmin(membershipId: string, permissionId: string) {
     const adminEmail = 'superadmin@gmail.com';
 
-    try {
-      const existingUser = await this.prisma.user.findUnique({
-        where: { email: adminEmail },
-      });
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: adminEmail },
+    });
 
-      if (!existingUser) {
-        const hashedPassword = await bcrypt.hash('admin123', 10);
-        const foundational = await this.prisma.membership.findFirst({
-          where: { tier: 'FOUNDATIONAL' },
-        });
+    if (!existingUser) {
+      this.logger.log(`🚀 Creating Super Admin: ${adminEmail}`);
+      const hashedPassword = await bcrypt.hash('superadmin@gmail.com', 10);
+      const randomPart = Math.floor(100000 + Math.random() * 900000).toString();
 
-        await this.prisma.user.create({
-          data: {
-            userName: 'superadmin',
-            email: adminEmail,
-            password: hashedPassword,
-            roleType: RoleType.SUPER_ADMIN,
-            membershipId: foundational!.id,
-            permissions: {
-              connect: [{ id: permission.id }],
-            },
+      await this.prisma.user.create({
+        data: {
+          fullName: 'Super Admin',
+          email: adminEmail,
+          password: hashedPassword,
+          roleType: RoleType.SUPER_ADMIN,
+          membershipId: membershipId,
+          pcrPrefix: 'CEO',
+          pcrIncremental: '0001',
+          pcrRandom: randomPart,
+          pcrId: `PCR-CEO0001-${randomPart}`,
+          city: 'System',
+          state: 'System',
+          zipCode: '0000',
+          country: 'System',
+          isVerified: true,
+          status: 'ACTIVE',
+          permissions: {
+            connect: { id: permissionId },
           },
-        });
-        this.logger.log(`✅ Super Admin (${adminEmail}) seeded!`);
-      }
-    } catch (error: any) {
-      this.logger.error('❌ Seed Error:', error.message);
+        },
+      });
+      this.logger.log(`✅ Super Admin created.`);
+    } else {
+      this.logger.log(
+        `ℹ️ Super Admin (${adminEmail}) already exists. Skipping...`,
+      );
     }
+  }
+
+  // 4. Breeds Seed (From your Screenshots)
+  async seedBreeds() {
+    const breedsData = [
+      // --- DESIGNER BREEDS (Excel Sheet 1) ---
+      {
+        breedCode: '301',
+        name: 'Labradoodle',
+        acronym: 'LBD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '302',
+        name: 'Goldendoodle',
+        acronym: 'GLD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '303',
+        name: 'Bernedoodle',
+        acronym: 'BRD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '304',
+        name: 'Aussiedoodle',
+        acronym: 'ASD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '305',
+        name: 'Sheepadoodle',
+        acronym: 'SPD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '306',
+        name: 'Cavapoo',
+        acronym: 'CVP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '307',
+        name: 'Cockapoo',
+        acronym: 'CKP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '308',
+        name: 'Pomsky',
+        acronym: 'PMS',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1',
+      },
+      {
+        breedCode: '309',
+        name: 'Maltipoo',
+        acronym: 'MTP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '310',
+        name: 'Yorkipoo',
+        acronym: 'YKP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '311',
+        name: 'Havapoo',
+        acronym: 'HVP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '312',
+        name: 'Schnoodle',
+        acronym: 'SND',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '313',
+        name: 'Shih-poo',
+        acronym: 'SHP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '314',
+        name: 'Peekapoo',
+        acronym: 'PKP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '315',
+        name: 'Puggle',
+        acronym: 'PGL',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1',
+      },
+      {
+        breedCode: '316',
+        name: 'Doberdoodle',
+        acronym: 'DBD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1',
+      },
+      {
+        breedCode: '317',
+        name: 'Boxerdoodle',
+        acronym: 'BXD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1',
+      },
+      {
+        breedCode: '318',
+        name: 'Newfypoo',
+        acronym: 'NFP',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '319',
+        name: 'Saint Berdoodle',
+        acronym: 'SBD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '320',
+        name: 'Pyredoodle',
+        acronym: 'PRD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '321',
+        name: 'Whoodle',
+        acronym: 'WHL',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '322',
+        name: 'Irish Doodle',
+        acronym: 'IRD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '323',
+        name: 'Springerdoodle',
+        acronym: 'SRD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '324',
+        name: 'Double Doodle',
+        acronym: 'DDD',
+        type: 'DESIGNER',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: 'F1, F1B',
+      },
+      {
+        breedCode: '325',
+        name: 'French Boodle',
+        acronym: 'FBD',
+        type: 'DESIGNER',
+        tierEligibility: 'Health Review Required',
+        eligibleGen: 'F1, F1B',
+      },
+
+      // --- INTERNAL BREEDS (Excel Sheet 2) ---
+      {
+        breedCode: '049',
+        name: 'Akita',
+        acronym: 'AKT',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '053',
+        name: 'Beagle',
+        acronym: 'BGL',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '012',
+        name: 'Afghan Hound',
+        acronym: 'AFH',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '062',
+        name: 'Border Collie',
+        acronym: 'BCL',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '065',
+        name: 'Boxer',
+        acronym: 'BXR',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '071',
+        name: 'Bulldog',
+        acronym: 'BLD',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '082',
+        name: 'Chihuahua',
+        acronym: 'CHI',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '095',
+        name: 'Dachshund',
+        acronym: 'DCH',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '101',
+        name: 'Doberman Pinscher',
+        acronym: 'DOB',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '119',
+        name: 'German Shepherd Dog',
+        acronym: 'GSD',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '124',
+        name: 'Golden Retriever',
+        acronym: 'GRT',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '131',
+        name: 'Great Dane',
+        acronym: 'GRD',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '145',
+        name: 'Labrador Retriever',
+        acronym: 'LAB',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '158',
+        name: 'Mastiff',
+        acronym: 'MST',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '182',
+        name: 'Poodle (Standard)',
+        acronym: 'PDS',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '183',
+        name: 'Poodle (Miniature)',
+        acronym: 'PDM',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '184',
+        name: 'Poodle (Toy)',
+        acronym: 'PDT',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '188',
+        name: 'Pug',
+        acronym: 'PUG',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '194',
+        name: 'Rottweiler',
+        acronym: 'ROT',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '202',
+        name: 'Siberian Husky',
+        acronym: 'SHB',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+      {
+        breedCode: '211',
+        name: 'Shih Tzu',
+        acronym: 'STZ',
+        type: 'INTERNAL',
+        tierEligibility: 'Gold - Auto Eligible',
+        eligibleGen: null,
+      },
+    ];
+
+    for (const b of breedsData) {
+      await this.prisma.breed.upsert({
+        where: { breedCode: b.breedCode },
+        update: b,
+        create: b,
+      });
+    }
+    this.logger.log('✅ Breed data (Designer & Internal) seeded.');
   }
 }

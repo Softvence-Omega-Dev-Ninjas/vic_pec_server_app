@@ -1,8 +1,21 @@
 model Canine {
   id                String              @id @default(uuid())
-  pcrId             String              @unique // Unique PCR ID is mandatory for relation
+
+  // ID separation for better management
+  pcrId            String   @unique // e.g., PCR-G301-00001-123456
+  // ID Components
+  pcrPrefix        String   // 'G' or 'B'
+  pcrBreedCode     String   // '301'
+  generation     String?  // 'F1', 'F1B'
+  pcrIncremental   String   // '00001'
+  pcrRandom        String   // '123456'
+
+  // Relations
+  breedId          String
+  breedRelation    Breed    @relation(fields: [breedId], references: [id])
+
+
   name              String
-  breed             String
   gender            Gender
   dateOfBirth       DateTime
   color             String
