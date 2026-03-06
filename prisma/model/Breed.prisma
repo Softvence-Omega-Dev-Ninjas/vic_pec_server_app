@@ -1,0 +1,15 @@
+model Breed {
+  id               String   @id @default(uuid())
+  breedCode        String   @unique // '301', '119'
+  name             String   // 'Labradoodle'
+  acronym          String   // 'LBD'
+  type             String   // 'DESIGNER' or 'INTERNAL'
+  tierEligibility  String?  // 'Gold - Auto Eligible'
+  eligibleGen      String?  // 'F1, F1B'
+  
+  canines          Canine[]
+  litters          Litter[]
+  @@map("breeds")
+}
+
+

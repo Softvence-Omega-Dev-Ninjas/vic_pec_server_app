@@ -1,9 +1,20 @@
 model Litter {
   id                String            @id @default(uuid())
 
-  pcrId             String            @unique // Unique PCR ID for the Litter
+  pcrId            String   @unique // Example: 'PCR-L301-F1B-00001-564738'
+  
+  // ID Components
+  pcrPrefix        String   @default("L")
+  pcrBreedCode     String   // '301', '302' etc.
+  generation       String   // 'F1', 'F1B', 'F2'
+  pcrIncremental   String   // '00001' (Tracked for reuse)
+  pcrRandom        String   // '564738' (6-digit security part)
+  
+  breedId          String
+  breedRelation    Breed    @relation(fields: [breedId], references: [id])
+
+
   name              String
-  breed             String
   gender            Gender
   dateOfBirth       DateTime
 
