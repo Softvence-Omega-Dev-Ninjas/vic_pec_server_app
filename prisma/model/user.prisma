@@ -33,7 +33,7 @@ model User {
 
   // Settings
   emailNotifications    Boolean             @default(true)
-  showOwnerId           Boolean             @default(false)
+  showOwnerId           Boolean             @default(true)
 
   // Ownership Transfers
   sentTransfers         OwnershipTransfer[] @relation("SentTransfers")
@@ -53,6 +53,8 @@ model User {
 
   certificateRequests CertificateRequest[] @relation("UserCertRequests")
 
+  subscriptions     Subscription[]
+
   lastLogin             DateTime?           @default(now())
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
@@ -62,42 +64,68 @@ model User {
 
 
 model AccessPermission {
-  id          String         @id @default(uuid())
-  name        String         @unique 
-  description String?        
+  id          String       @id @default(uuid())
+  resource    ResourceType 
   
-  resources   ResourceType[] 
-  
-  canView     Boolean        @default(false)
-  canCreate   Boolean        @default(false)
-  canEdit     Boolean        @default(false)
-  canDelete   Boolean        @default(false)
+  canView     Boolean      @default(false)
+  canCreate   Boolean      @default(false)
+  canEdit     Boolean      @default(false)
+  canDelete   Boolean      @default(false)
 
-  users       User[]
+  // Relation to User
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, resource])
   @@map("access_permissions")
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 model Membership {
-  id                    String   @id @default(uuid())
-  tier                  String   @unique 
-  price                 Float    @default(0)
+  id            String         @id @default(uuid())
+  tier          String         @unique 
+  name          String
+  currentPrice  Float          @default(0)
+  stripePriceId String?        @unique 
+  features      Json?
+  canineLimit   Int            @default(1)
   
-  canineLimit           Int      @default(1)
-  canineLimitLabel      String   @default("Initial Canine Registration(s)")
-
-  standardPricing       Boolean  @default(true)
-  pricingLabel          String   @default("Standard Pricing on PCR Registration Certificates & Pedigrees")
-
-  freeLitterReg         Boolean  @default(false)
-  litterRegLabel        String   @default("Standard Litter Registration & Canine Transfer Fees")
-
-  freeDigitalDownloads  Boolean  @default(false)
-  digitalDownloadsLabel String?  
-
-  directAssistance      Boolean  @default(false)
-  assistanceLabel       String?  
-
-  users                 User[]
+  users         User[]
+  subscriptions Subscription[]
   @@map("memberships")
+}
+
+model Subscription {
+  id                   String   @id @default(uuid())
+  stripeSubscriptionId String   @unique
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+  membershipId         String
+  membership           Membership @relation(fields: [membershipId], references: [id])
+
+  amountPaid           Float   
+  currency             String   @default("USD")
+  status               String   // active, canceled, past_due
+  
+  currentPeriodStart   DateTime @default(now())
+  currentPeriodEnd     DateTime
+  
+  createdAt            DateTime @default(now())
+  @@map("subscriptions")
 }

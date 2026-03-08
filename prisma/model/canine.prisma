@@ -6,7 +6,7 @@ model Canine {
   // ID Components
   pcrPrefix        String   // 'G' or 'B'
   pcrBreedCode     String   // '301'
-  generation     String?  // 'F1', 'F1B'
+  generation       String?  // 'F1', 'F1B'
   pcrIncremental   String   // '00001'
   pcrRandom        String   // '123456'
 
@@ -19,13 +19,13 @@ model Canine {
   gender            Gender
   dateOfBirth       DateTime
   color             String
-  weight            Float?
+  weight            Float
   city              String
   state             String
   zipCode           String
   country           String
-  microchipId       String?             @unique
-  primaryBreedDNA   String?
+  microchipId       String             @unique
+  primaryBreedDNA   String
   secondaryBreedDNA String?
   healthStatus      String              @default("Excellent")
   vaccinations      VaccinationType[]
