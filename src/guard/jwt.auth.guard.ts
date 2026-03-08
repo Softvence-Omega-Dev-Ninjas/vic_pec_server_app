@@ -27,6 +27,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       select: {
         id: true,
         isVerified: true,
+        roleType: true,
       },
     });
 
@@ -41,6 +42,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     }
 
     request.userId = user.id;
+    request.user = {
+      userId: user.id,
+      role: user.roleType,
+    };
 
     return true;
   }

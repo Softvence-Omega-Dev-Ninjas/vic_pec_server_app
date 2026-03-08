@@ -25,7 +25,7 @@ model Report {
   litterId          String?
   litter            Litter?        @relation("LitterReports", fields: [litterId], references: [id], onDelete: Cascade)
 
-  createdAt         DateTime       @default(now()) // Report Date
+  createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
   @@map("reports")

@@ -19,13 +19,13 @@ model Litter {
   dateOfBirth       DateTime
 
   color             String
-  weight            Float?
+  weight            Float
 
   city              String
   state             String
   zipCode           String
   country           String
-  microchipId       String?           @unique
+  microchipId       String           @unique
   healthStatus      String            @default("Excellent")
   vaccinations      VaccinationType[]
   healthClearances  HealthClearance[]

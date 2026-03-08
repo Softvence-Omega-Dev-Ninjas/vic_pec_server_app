@@ -19,149 +19,144 @@ export class SeedService implements OnModuleInit {
     try {
       this.logger.log('🌱 Starting Seeding process...');
 
-      const foundationalMembership = await this.seedMemberships();
-      if (!foundationalMembership) {
-        throw new Error('❌ Foundational membership seeding returned null.');
-      }
+      // const foundationalMembership = await this.seedMemberships();
+      // if (!foundationalMembership)
+      //   throw new Error('❌ Membership seeding failed.');
 
-      const adminPermissions = await this.seedAccessPermissions();
-      if (!adminPermissions) {
-        throw new Error('❌ Admin permissions seeding returned null.');
-      }
+      // const superAdmin = await this.seedSuperAdmin(foundationalMembership.id);
 
-      await this.seedSuperAdmin(foundationalMembership.id, adminPermissions.id);
+      // await this.seedAccessPermissions(superAdmin.id);
 
-      // 4. Seed Breeds
       await this.seedBreeds();
 
       this.logger.log('✅ Seeding completed successfully.');
     } catch (error: any) {
-      this.logger.error('❌ Seeding failed detailed message:', error.message);
+      this.logger.error('❌ Seeding failed:', error.message);
     }
   }
-  // 1. Memberships Seed
-  async seedMemberships() {
-    const tiers = [
-      {
-        tier: 'FOUNDATIONAL',
-        price: 0,
-        canineLimit: 1,
-        canineLimitLabel: 'One (1) Initial Canine Registration',
-        pricingLabel:
-          'Standard Pricing on PCR Registration Certificates & Pedigrees',
-        litterRegLabel: 'Standard Litter Registration & Canine Transfer Fees',
-        freeLitterReg: false,
-        freeDigitalDownloads: false,
-        directAssistance: false,
-      },
-      {
-        tier: 'REGISTRY',
-        price: 65,
-        canineLimit: 3,
-        canineLimitLabel: 'Three (3) Initial Canine Registrations',
-        pricingLabel: 'Discounted PCR Registrations, Certificates & Pedigrees',
-        litterRegLabel:
-          'Discounted Litter Registrations & Canine Transfer Fees',
-        digitalDownloadsLabel:
-          'Free Digital Downloads of Certificates & Pedigrees',
-        freeLitterReg: false,
-        freeDigitalDownloads: true,
-        directAssistance: false,
-      },
-      {
-        tier: 'PRESTIGE',
-        price: 150,
-        canineLimit: 7,
-        canineLimitLabel: 'Seven (7) Initial Canine Registrations',
-        pricingLabel:
-          'Complimentary Registration Certificate & Canine Pedigree*',
-        litterRegLabel: 'Free Litter Registrations & Canine Transfers',
-        digitalDownloadsLabel: "Access to PCR's Private PA Communication Group",
-        assistanceLabel: 'Direct PA Assistance',
-        freeLitterReg: true,
-        freeDigitalDownloads: true,
-        directAssistance: true,
-      },
-    ];
+  // async seedMemberships() {
+  //   const tiers = [
+  //     {
+  //       tier: 'FOUNDATIONAL',
+  //       price: 0,
+  //       canineLimit: 1,
+  //       canineLimitLabel: 'One (1) Initial Canine Registration',
+  //       pricingLabel:
+  //         'Standard Pricing on PCR Registration Certificates & Pedigrees',
+  //       litterRegLabel: 'Standard Litter Registration & Canine Transfer Fees',
+  //       freeLitterReg: false,
+  //       freeDigitalDownloads: false,
+  //       directAssistance: false,
+  //     },
+  //     {
+  //       tier: 'REGISTRY',
+  //       price: 65,
+  //       canineLimit: 3,
+  //       canineLimitLabel: 'Three (3) Initial Canine Registrations',
+  //       pricingLabel: 'Discounted PCR Registrations, Certificates & Pedigrees',
+  //       litterRegLabel:
+  //         'Discounted Litter Registrations & Canine Transfer Fees',
+  //       digitalDownloadsLabel:
+  //         'Free Digital Downloads of Certificates & Pedigrees',
+  //       freeLitterReg: false,
+  //       freeDigitalDownloads: true,
+  //       directAssistance: false,
+  //     },
+  //     {
+  //       tier: 'PRESTIGE',
+  //       price: 150,
+  //       canineLimit: 7,
+  //       canineLimitLabel: 'Seven (7) Initial Canine Registrations',
+  //       pricingLabel:
+  //         'Complimentary Registration Certificate & Canine Pedigree*',
+  //       litterRegLabel: 'Free Litter Registrations & Canine Transfers',
+  //       digitalDownloadsLabel: "Access to PCR's Private PA Communication Group",
+  //       assistanceLabel: 'Direct PA Assistance',
+  //       freeLitterReg: true,
+  //       freeDigitalDownloads: true,
+  //       directAssistance: true,
+  //     },
+  //   ];
 
-    for (const t of tiers) {
-      await this.prisma.membership.upsert({
-        where: { tier: t.tier },
-        update: t,
-        create: t,
+  //   for (const t of tiers) {
+  //     await this.prisma.membership.upsert({
+  //       where: { tier: t.tier },
+  //       update: t,
+  //       create: t,
+  //     });
+  //   }
+  //   this.logger.log('✅ Membership Tiers seeded.');
+
+  //   return await this.prisma.membership.findUnique({
+  //     where: { tier: 'FOUNDATIONAL' },
+  //   });
+  // }
+
+  async seedAccessPermissions(superAdminId: string) {
+    const allResources = Object.values(ResourceType) as ResourceType[];
+
+    for (const resource of allResources) {
+      await this.prisma.accessPermission.upsert({
+        where: {
+          userId_resource: {
+            userId: superAdminId,
+            resource: resource,
+          },
+        },
+        update: {
+          canView: true,
+          canCreate: true,
+          canEdit: true,
+          canDelete: true,
+        },
+        create: {
+          userId: superAdminId,
+          resource: resource,
+          canView: true,
+          canCreate: true,
+          canEdit: true,
+          canDelete: true,
+        },
       });
     }
-    this.logger.log('✅ Membership Tiers seeded.');
-
-    return await this.prisma.membership.findUnique({
-      where: { tier: 'FOUNDATIONAL' },
-    });
-  }
-
-  // 2. Access Permissions Seed
-  async seedAccessPermissions() {
-    const allResources = Object.values(ResourceType);
-
-    const fullAccess = await this.prisma.accessPermission.upsert({
-      where: { name: 'Full Admin Access' },
-      update: { resources: allResources },
-      create: {
-        name: 'Full Admin Access',
-        description: 'Complete access to all modules.',
-        resources: allResources,
-        canView: true,
-        canCreate: true,
-        canEdit: true,
-        canDelete: true,
-      },
-    });
-    this.logger.log('✅ Permissions seeded.');
-    return fullAccess;
+    this.logger.log('✅ Full Permissions assigned to Super Admin.');
   }
 
   // 3. Super Admin Seed
-  async seedSuperAdmin(membershipId: string, permissionId: string) {
+  async seedSuperAdmin(membershipId: string) {
     const adminEmail = 'superadmin@gmail.com';
+    const hashedPassword = await bcrypt.hash('superadmin@gmail.com', 10);
+    const randomPart = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const existingUser = await this.prisma.user.findUnique({
+    const superAdmin = await this.prisma.user.upsert({
       where: { email: adminEmail },
+      update: {
+        roleType: RoleType.SUPER_ADMIN,
+        status: 'ACTIVE' as any,
+        isVerified: true,
+      },
+      create: {
+        fullName: 'Super Admin',
+        email: adminEmail,
+        password: hashedPassword,
+        roleType: RoleType.SUPER_ADMIN,
+        membershipId: membershipId,
+        pcrPrefix: 'CEO',
+        pcrIncremental: '0001',
+        pcrRandom: randomPart,
+        pcrId: `PCR-CEO0001-${randomPart}`,
+        city: 'System',
+        state: 'System',
+        zipCode: '0000',
+        country: 'System',
+        isVerified: true,
+        status: 'ACTIVE' as any,
+      },
     });
 
-    if (!existingUser) {
-      this.logger.log(`🚀 Creating Super Admin: ${adminEmail}`);
-      const hashedPassword = await bcrypt.hash('superadmin@gmail.com', 10);
-      const randomPart = Math.floor(100000 + Math.random() * 900000).toString();
-
-      await this.prisma.user.create({
-        data: {
-          fullName: 'Super Admin',
-          email: adminEmail,
-          password: hashedPassword,
-          roleType: RoleType.SUPER_ADMIN,
-          membershipId: membershipId,
-          pcrPrefix: 'CEO',
-          pcrIncremental: '0001',
-          pcrRandom: randomPart,
-          pcrId: `PCR-CEO0001-${randomPart}`,
-          city: 'System',
-          state: 'System',
-          zipCode: '0000',
-          country: 'System',
-          isVerified: true,
-          status: 'ACTIVE',
-          permissions: {
-            connect: { id: permissionId },
-          },
-        },
-      });
-      this.logger.log(`✅ Super Admin created.`);
-    } else {
-      this.logger.log(
-        `ℹ️ Super Admin (${adminEmail}) already exists. Skipping...`,
-      );
-    }
+    this.logger.log(`✅ Super Admin is ready (ID: ${superAdmin.id})`);
+    return superAdmin;
   }
-
   // 4. Breeds Seed (From your Screenshots)
   async seedBreeds() {
     const breedsData = [
