@@ -19,13 +19,13 @@ export class SeedService implements OnModuleInit {
     try {
       this.logger.log('🌱 Starting Seeding process...');
 
-      // const foundationalMembership = await this.seedMemberships();
-      // if (!foundationalMembership)
-      //   throw new Error('❌ Membership seeding failed.');
+      const foundationalMembership = await this.seedMemberships();
+      if (!foundationalMembership)
+        throw new Error('❌ Membership seeding failed.');
 
-      // const superAdmin = await this.seedSuperAdmin(foundationalMembership.id);
+      const superAdmin = await this.seedSuperAdmin(foundationalMembership.id);
 
-      // await this.seedAccessPermissions(superAdmin.id);
+      await this.seedAccessPermissions(superAdmin.id);
 
       await this.seedBreeds();
 
@@ -34,63 +34,61 @@ export class SeedService implements OnModuleInit {
       this.logger.error('❌ Seeding failed:', error.message);
     }
   }
-  // async seedMemberships() {
-  //   const tiers = [
-  //     {
-  //       tier: 'FOUNDATIONAL',
-  //       price: 0,
-  //       canineLimit: 1,
-  //       canineLimitLabel: 'One (1) Initial Canine Registration',
-  //       pricingLabel:
-  //         'Standard Pricing on PCR Registration Certificates & Pedigrees',
-  //       litterRegLabel: 'Standard Litter Registration & Canine Transfer Fees',
-  //       freeLitterReg: false,
-  //       freeDigitalDownloads: false,
-  //       directAssistance: false,
-  //     },
-  //     {
-  //       tier: 'REGISTRY',
-  //       price: 65,
-  //       canineLimit: 3,
-  //       canineLimitLabel: 'Three (3) Initial Canine Registrations',
-  //       pricingLabel: 'Discounted PCR Registrations, Certificates & Pedigrees',
-  //       litterRegLabel:
-  //         'Discounted Litter Registrations & Canine Transfer Fees',
-  //       digitalDownloadsLabel:
-  //         'Free Digital Downloads of Certificates & Pedigrees',
-  //       freeLitterReg: false,
-  //       freeDigitalDownloads: true,
-  //       directAssistance: false,
-  //     },
-  //     {
-  //       tier: 'PRESTIGE',
-  //       price: 150,
-  //       canineLimit: 7,
-  //       canineLimitLabel: 'Seven (7) Initial Canine Registrations',
-  //       pricingLabel:
-  //         'Complimentary Registration Certificate & Canine Pedigree*',
-  //       litterRegLabel: 'Free Litter Registrations & Canine Transfers',
-  //       digitalDownloadsLabel: "Access to PCR's Private PA Communication Group",
-  //       assistanceLabel: 'Direct PA Assistance',
-  //       freeLitterReg: true,
-  //       freeDigitalDownloads: true,
-  //       directAssistance: true,
-  //     },
-  //   ];
+  async seedMemberships() {
+    const tiers = [
+      {
+        tier: 'FOUNDATIONAL',
+        name: 'Foundational Member',
+        currentPrice: 0,
+        canineLimit: 1,
+        features: [
+          'One (1) Canine Registration',
+          'Standard Pricing on PCR Registration Certificates & Pedigrees',
+          'Standard Litter Registration & Canine Transfer Fees',
+        ],
+      },
+      {
+        tier: 'REGISTRY',
+        name: 'Registry Member',
+        currentPrice: 80,
+        canineLimit: 3,
+        features: [
+          'Three (3) Canine Registrations',
+          'Discounted PCR Registration Certificates & Pedigrees',
+          'Discounted Litter Registrations & Canine Transfer Fees',
+          'Free Digital Downloads of Certificates & Pedigrees',
+        ],
+      },
+      {
+        tier: 'PRESTIGE',
+        name: 'Prestige Ambassadors',
+        currentPrice: 150,
+        canineLimit: 7,
+        features: [
+          'Seven (7) Canine Registrations',
+          'Complimentary Registration Certificate & Canine Pedigree',
+          'Free Litter Registrations & Canine Transfers',
+          "Access to PCR's Private PA Communication Group",
+          'Direct PA Assistance',
+        ],
+      },
+    ];
 
-  //   for (const t of tiers) {
-  //     await this.prisma.membership.upsert({
-  //       where: { tier: t.tier },
-  //       update: t,
-  //       create: t,
-  //     });
-  //   }
-  //   this.logger.log('✅ Membership Tiers seeded.');
+    for (const t of tiers) {
+      await this.prisma.membership.upsert({
+        where: { tier: t.tier },
+        update: t,
+        create: t,
+      });
+    }
+    this.logger.log(
+      '✅ Membership Tiers (Foundational, Registry, Prestige) seeded.',
+    );
 
-  //   return await this.prisma.membership.findUnique({
-  //     where: { tier: 'FOUNDATIONAL' },
-  //   });
-  // }
+    return await this.prisma.membership.findUnique({
+      where: { tier: 'FOUNDATIONAL' },
+    });
+  }
 
   async seedAccessPermissions(superAdminId: string) {
     const allResources = Object.values(ResourceType) as ResourceType[];

@@ -77,8 +77,12 @@ export class LitterController {
   @Get(':litterId')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get a single litter by litterId' })
-  async findOne(@Param('litterId') litterId: string) {
-    return await this.litterService.findOne(litterId);
+  async findOne(@Param('litterId') litterId: string, @Req() req: any) {
+    return await this.litterService.findOne(
+      litterId,
+      req.userId,
+      req.user?.role,
+    );
   }
 
   @Patch(':litterId')

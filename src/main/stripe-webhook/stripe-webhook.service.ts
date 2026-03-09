@@ -1,6 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import {
   Injectable,
   BadRequestException,
@@ -20,7 +20,7 @@ export class StripeWebhookService {
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    this.stripe = new Stripe(this.configService.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2024-12-18.acacia' as any,
     });
   }
@@ -32,11 +32,11 @@ export class StripeWebhookService {
       event = this.stripe.webhooks.constructEvent(
         payload,
         signature,
-        process.env.STRIPE_WEBHOOK_SECRET!,
+        this.configService.get('STRIPE_WEBHOOK_SECRET')!,
       );
     } catch (err: any) {
       this.logger.error(
-        ` Webhook signature verification failed: ${err.message}`,
+        `Webhook signature verification failed: ${err.message}`,
       );
       throw new BadRequestException(`Webhook Error: ${err.message}`);
     }

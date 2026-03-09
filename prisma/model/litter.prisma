@@ -9,6 +9,7 @@ model Litter {
   generation       String   // 'F1', 'F1B', 'F2'
   pcrIncremental   String   // '00001' (Tracked for reuse)
   pcrRandom        String   // '564738' (6-digit security part)
+  tier         RegistryTier  @default(BLUE)
   
   breedId          String
   breedRelation    Breed    @relation(fields: [breedId], references: [id])
@@ -43,6 +44,9 @@ model Litter {
   // User Relations (Fixed Ambiguity)
   ownerId           String
   owner             User              @relation("LitterOwner", fields: [ownerId], references: [id])
+
+
+  healthRequests   CanineHealthRequest[] @relation("LitterHealthRequests")
 
   reports     Report[] @relation("LitterReports")
 

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -24,6 +22,9 @@ import { PermissionModule } from './main/admin/permission/permission.module';
 import { MembershipPlanModule } from './main/admin/membership-plan/membership-plan.module';
 import { PaymentModule } from './main/payment/payment.module';
 import { StripeWebhookModule } from './main/stripe-webhook/stripe-webhook.module';
+import { RequestHelthReportModule } from './main/request-helth-report/request-helth-report.module';
+import { StatsAndTireModule } from './main/admin/stats-and-tire/stats-and-tire.module';
+import { PermissionService } from './main/admin/permission/permission.service';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -47,8 +48,16 @@ import { StripeWebhookModule } from './main/stripe-webhook/stripe-webhook.module
     MembershipPlanModule,
     PaymentModule,
     StripeWebhookModule,
+    RequestHelthReportModule,
+    StatsAndTireModule,
   ],
   controllers: [AppController],
-  providers: [AppService, SeedService, PrismaService, MailService],
+  providers: [
+    AppService,
+    SeedService,
+    PrismaService,
+    MailService,
+    PermissionService,
+  ],
 })
 export class AppModule {}

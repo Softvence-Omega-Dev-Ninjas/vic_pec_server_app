@@ -7,12 +7,14 @@ import {
   Logger,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 // import { CloudinaryService } from 'src/common/cloudinary/cloudinary.service';
 import { CreateLitterDto, UpdateLitterDto } from './dto/create-litter.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { LitterQueryDto } from './dto/LitterQueryDto';
+import { RegistryTier } from 'generated/prisma/enums';
 
 @Injectable()
 export class LitterService {
@@ -30,11 +32,34 @@ export class LitterService {
     docs: Express.Multer.File[],
   ) {
     try {
+      const breed = await this.prisma.breed.findUnique({
+        where: { id: dto.breedId },
+      });
+
+      if (!breed) throw new NotFoundException('Selected breed not found');
+
+      const pcrBreedCode = breed.breedCode;
+
+      if (breed.type === 'DESIGNER' && dto.generation !== 'F1') {
+        const parentPcrIds = [dto.motherPcrId, dto.fatherPcrId].filter(Boolean);
+
+        const f1Ancestor = await this.prisma.canine.findFirst({
+          where: {
+            pcrId: { in: parentPcrIds as any },
+            generation: 'F1',
+          },
+        });
+
+        if (!f1Ancestor && parentPcrIds.length > 0) {
+          throw new BadRequestException(
+            'Registration rejected: Any later generations (F1B, F2, VD) must trace back to a registered F1 ancestor',
+          );
+        }
+      }
+
+      // ৩. PCR ID Generation (Prefix 'L' for Litter)
       const lastLitter = await this.prisma.litter.findFirst({
-        where: {
-          pcrBreedCode: dto.pcrBreedCode,
-          generation: dto.generation,
-        },
+        where: { pcrBreedCode, generation: dto.generation },
         orderBy: { pcrIncremental: 'desc' },
       });
 
@@ -42,7 +67,11 @@ export class LitterService {
       const pcrIncremental = nextInc.toString().padStart(5, '0');
       const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
 
-      const pcrId = `PCR-L${dto.pcrBreedCode}-${dto.generation}-${pcrIncremental}-${pcrRandom}`;
+      // Format: PCR-L301-F1B-00001-123456
+      const pcrId = `PCR-L${pcrBreedCode}-${dto.generation}-${pcrIncremental}-${pcrRandom}`;
+
+      const tier =
+        breed.type === 'DESIGNER' ? RegistryTier.GOLD : RegistryTier.BLUE;
 
       const [imageUrlList, docUrlList] = await Promise.all([
         this.cloudinary.uploadImages(images),
@@ -60,27 +89,15 @@ export class LitterService {
 
         return await tx.litter.create({
           data: {
+            ...dto,
             pcrId,
             pcrPrefix: 'L',
-            pcrBreedCode: dto.pcrBreedCode,
-            generation: dto.generation,
+            pcrBreedCode,
             pcrIncremental,
             pcrRandom,
-            name: dto.name,
-            gender: dto.gender,
+            tier,
             dateOfBirth: new Date(dto.dateOfBirth),
-            color: dto.color,
-            weight: dto.weight,
-            city: dto.city,
-            state: dto.state,
-            zipCode: dto.zipCode,
-            country: dto.country,
-            microchipId: dto.microchipId,
-            breedId: dto.breedId,
             ownerId: userId,
-            motherPcrId: dto.motherPcrId,
-            fatherPcrId: dto.fatherPcrId,
-
             images: {
               create: (imageUrlList as any).map((url: any) => ({ url })),
             },
@@ -101,7 +118,13 @@ export class LitterService {
       });
     } catch (error: any) {
       this.logger.error(`Litter creation failed: ${error.message}`);
-      if (error instanceof ConflictException) throw error;
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         error.message || 'Error occurred while creating litter',
       );
@@ -167,7 +190,7 @@ export class LitterService {
     }
   }
 
-  async findOne(litterId: string) {
+  async findOne(litterId: string, currentUserId?: string, userRole?: string) {
     try {
       const litter = await this.prisma.litter.findUnique({
         where: { id: litterId },
@@ -177,7 +200,9 @@ export class LitterService {
           mother: true,
           father: true,
           breedRelation: true,
-          owner: { select: { fullName: true, email: true } },
+          owner: {
+            select: { id: true, fullName: true, email: true, pcrId: true },
+          },
           puppies: true,
           _count: { select: { puppies: true } },
         },
@@ -185,6 +210,38 @@ export class LitterService {
 
       if (!litter) {
         throw new NotFoundException(`Litter with ID ${litterId} not found`);
+      }
+
+      const isOwner = currentUserId === litter.ownerId;
+      const isAdmin = userRole === 'SUPER_ADMIN';
+
+      if (isOwner || isAdmin) {
+        return litter;
+      }
+
+      let hasApprovedRequest = false;
+      if (currentUserId) {
+        const approvedRequest = await this.prisma.canineHealthRequest.findFirst(
+          {
+            where: {
+              litterId: litter.id,
+              requesterId: currentUserId,
+              status: 'APPROVED',
+            },
+          },
+        );
+        if (approvedRequest) hasApprovedRequest = true;
+      }
+
+      if (!hasApprovedRequest) {
+        return {
+          ...litter,
+          healthStatus: 'HIDDEN (Request Access)',
+          healthNotes: 'Contact owner for health details',
+          DNAdocuments: [],
+          vaccinations: [],
+          healthClearances: [],
+        };
       }
 
       return litter;
@@ -196,7 +253,6 @@ export class LitterService {
       );
     }
   }
-
   async update(litterId: string, dto: UpdateLitterDto) {
     try {
       // Existence check

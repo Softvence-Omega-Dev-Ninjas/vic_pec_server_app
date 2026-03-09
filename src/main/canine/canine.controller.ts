@@ -69,8 +69,8 @@ export class CanineController {
   @Get(':canineId')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get canine details by ID' })
-  async findOne(@Param('canineId') canineId: string) {
-    return await this.canineService.findOne(canineId);
+  async findOne(@Param('canineId') canineId: string, @Req() req: any) {
+    return this.canineService.findOne(canineId, req.userId, req.user?.role);
   }
 
   @Patch(':canineId')

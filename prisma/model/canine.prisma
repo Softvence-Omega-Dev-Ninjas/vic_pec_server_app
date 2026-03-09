@@ -9,7 +9,8 @@ model Canine {
   generation       String?  // 'F1', 'F1B'
   pcrIncremental   String   // '00001'
   pcrRandom        String   // '123456'
-
+  tier         RegistryTier  @default(BLUE)
+  
   // Relations
   breedId          String
   breedRelation    Breed    @relation(fields: [breedId], references: [id])
@@ -25,15 +26,19 @@ model Canine {
   zipCode           String
   country           String
   microchipId       String             @unique
+
+
   primaryBreedDNA   String
   secondaryBreedDNA String?
   healthStatus      String              @default("Excellent")
   vaccinations      VaccinationType[]
   healthClearances  HealthClearance[]
   healthNotes       String?             @db.Text
+  DNAdocuments      Document[]          @relation("CanineDocuments")
+
 
   images            Image[]             @relation("CanineImages")
-  DNAdocuments      Document[]          @relation("CanineDocuments")
+
   transfers         OwnershipTransfer[] @relation("CanineTransfers")
 
   // Owner Relation
@@ -48,6 +53,8 @@ model Canine {
   asMother          Litter[]            @relation("MotherRelation")
   asFather          Litter[]            @relation("FatherRelation")
 
+  healthRequests         CanineHealthRequest[] @relation("CanineHealthRequests")
+
   reports     Report[] @relation("CanineReports")
 
 
@@ -61,4 +68,10 @@ model Canine {
   updatedAt         DateTime            @updatedAt
 
   @@map("canines")
+}
+
+
+enum RegistryTier {
+  GOLD
+  BLUE
 }

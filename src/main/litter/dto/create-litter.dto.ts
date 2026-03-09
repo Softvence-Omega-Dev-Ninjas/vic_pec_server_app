@@ -11,16 +11,6 @@ import { Gender } from 'generated/prisma/enums';
 import { PartialType } from '@nestjs/swagger';
 
 export class CreateLitterDto {
-  @ApiProperty({ example: '301' })
-  @IsString()
-  @IsNotEmpty()
-  pcrBreedCode!: string;
-
-  @ApiProperty({ example: 'F1B' })
-  @IsString()
-  @IsNotEmpty()
-  generation!: string;
-
   @ApiProperty({ example: 'Litter 01 - Golden Retriever' })
   @IsString()
   @IsNotEmpty()
@@ -40,37 +30,22 @@ export class CreateLitterDto {
   @IsNotEmpty()
   color!: string;
 
-  @ApiProperty({ example: 12.5 }) // Now Required
+  @ApiProperty({ example: 12.5 })
   @IsNumber()
   @IsNotEmpty()
   weight!: number;
-
-  @ApiProperty({ example: 'Dallas' })
-  @IsString()
-  @IsNotEmpty()
-  city!: string;
-
-  @ApiProperty({ example: 'TX' })
-  @IsString()
-  @IsNotEmpty()
-  state!: string;
-
-  @ApiProperty({ example: '75201' })
-  @IsString()
-  @IsNotEmpty()
-  zipCode!: string;
-
-  @ApiProperty({ example: 'USA' })
-  @IsString()
-  @IsNotEmpty()
-  country!: string;
 
   @ApiProperty({ example: 'breed-uuid-here' })
   @IsString()
   @IsNotEmpty()
   breedId!: string;
 
-  @ApiProperty({ example: 'MC-123456789' }) // Now Required
+  @ApiProperty({ example: 'F1', description: 'Required for Designer breeds' })
+  @IsString()
+  @IsNotEmpty()
+  generation!: string;
+
+  @ApiProperty({ example: 'MC-123456789' })
   @IsString()
   @IsNotEmpty()
   microchipId!: string;
@@ -84,6 +59,12 @@ export class CreateLitterDto {
   @IsOptional()
   @IsString()
   fatherPcrId?: string;
+
+  // Location data
+  @ApiProperty({ example: 'Dallas' }) @IsString() @IsNotEmpty() city!: string;
+  @ApiProperty({ example: 'TX' }) @IsString() @IsNotEmpty() state!: string;
+  @ApiProperty({ example: '75201' }) @IsString() @IsNotEmpty() zipCode!: string;
+  @ApiProperty({ example: 'USA' }) @IsString() @IsNotEmpty() country!: string;
 }
 
 export class UpdateLitterDto extends PartialType(CreateLitterDto) {}

@@ -29,57 +29,30 @@ export class RegisterCanineDto {
   @IsNotEmpty()
   color!: string;
 
-  @ApiProperty({ example: 65.5 }) // Required as per your request
+  @ApiProperty({ example: 65.5 })
   @IsNumber()
   @IsNotEmpty()
   weight!: number;
-
-  @ApiProperty({ example: '301' })
-  @IsString()
-  @IsNotEmpty()
-  pcrBreedCode!: string;
-
-  @ApiProperty({ example: 'G' })
-  @IsString()
-  @IsNotEmpty()
-  pcrPrefix!: string; // 'G' or 'B'
-
-  @ApiPropertyOptional({ example: 'F1' })
-  @IsOptional()
-  @IsString()
-  generation?: string;
 
   @ApiProperty({ example: 'uuid-of-breed' })
   @IsString()
   @IsNotEmpty()
   breedId!: string;
 
-  @ApiProperty({ example: 'Dallas' })
+  @ApiPropertyOptional({
+    example: 'F1',
+    description: 'Required if breed type is DESIGNER. Options: F1, F1B, F2, VD',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  city!: string;
+  generation?: string;
 
-  @ApiProperty({ example: 'TX' })
-  @IsString()
-  @IsNotEmpty()
-  state!: string;
-
-  @ApiProperty({ example: '75201' })
-  @IsString()
-  @IsNotEmpty()
-  zipCode!: string;
-
-  @ApiProperty({ example: 'USA' })
-  @IsString()
-  @IsNotEmpty()
-  country!: string;
-
-  @ApiProperty({ example: '900123456789' }) // Required as per your request
+  @ApiProperty({ example: '900123456789' })
   @IsString()
   @IsNotEmpty()
   microchipId!: string;
 
-  @ApiPropertyOptional({ example: 'German Shepherd' })
+  @ApiProperty({ example: 'German Shepherd' })
   @IsNotEmpty()
   @IsString()
   primaryBreedDNA!: string;
@@ -88,6 +61,12 @@ export class RegisterCanineDto {
   @IsOptional()
   @IsString()
   secondaryBreedDNA?: string;
+
+  // Location fields
+  @ApiProperty({ example: 'Dallas' }) @IsString() @IsNotEmpty() city!: string;
+  @ApiProperty({ example: 'TX' }) @IsString() @IsNotEmpty() state!: string;
+  @ApiProperty({ example: '75201' }) @IsString() @IsNotEmpty() zipCode!: string;
+  @ApiProperty({ example: 'USA' }) @IsString() @IsNotEmpty() country!: string;
 
   @ApiPropertyOptional({ enum: RegistrationRequestType })
   @IsOptional()

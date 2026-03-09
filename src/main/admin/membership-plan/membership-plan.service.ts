@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
@@ -39,9 +40,8 @@ export class MembershipPlanService {
           tier: dto.tier,
           name: dto.name,
           currentPrice: dto.currentPrice,
-          stripePriceId: dto.stripePriceId,
           canineLimit: dto.canineLimit,
-          features: dto.features, // JSON Field
+          features: dto.features,
         },
       });
     } catch (error: any) {
@@ -63,6 +63,7 @@ export class MembershipPlanService {
         orderBy: { currentPrice: 'asc' },
       });
     } catch (error) {
+      this.logger.error(`Fetch Failed: ${error}`);
       console.log(error);
       throw new InternalServerErrorException(
         'Could not fetch membership plans',

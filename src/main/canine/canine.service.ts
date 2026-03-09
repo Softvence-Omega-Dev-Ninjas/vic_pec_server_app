@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -7,11 +8,13 @@ import {
   Logger,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { RegisterCanineDto, UpdateCanineDto } from './dto/create-canine.dto';
 import { CanineQueryDto } from './dto/canine-query.dto';
+import { RegistryTier } from 'generated/prisma/enums';
 
 @Injectable()
 export class CanineService {
@@ -30,33 +33,46 @@ export class CanineService {
     docs: Express.Multer.File[],
   ) {
     try {
-      // ১. PCR ID Generation Logic (Transaction এর বাইরে রাখা ঠিক আছে)
+      const breed = await this.prisma.breed.findUnique({
+        where: { id: dto.breedId },
+      });
+
+      if (!breed) {
+        throw new NotFoundException(`Breed with ID ${dto.breedId} not found`);
+      }
+
+      const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
+      const pcrBreedCode = breed.breedCode;
+
+      if (breed.type === 'DESIGNER' && !dto.generation) {
+        throw new BadRequestException(
+          'Generation is required for Designer breeds',
+        );
+      }
+
       const lastCanine = await this.prisma.canine.findFirst({
-        where: { pcrPrefix: dto.pcrPrefix, pcrBreedCode: dto.pcrBreedCode },
+        where: { pcrPrefix, pcrBreedCode },
         orderBy: { pcrIncremental: 'desc' },
       });
 
       const nextInc = lastCanine ? parseInt(lastCanine.pcrIncremental) + 1 : 1;
       const pcrIncremental = nextInc.toString().padStart(5, '0');
       const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
-      const pcrId = `PCR-${dto.pcrPrefix}${dto.pcrBreedCode}-${pcrIncremental}-${pcrRandom}`;
+      const pcrId = `PCR-${pcrPrefix}${pcrBreedCode}-${pcrIncremental}-${pcrRandom}`;
 
-      // ২. Media Upload (এটা ট্রানজ্যাকশনের বাইরেই থাকতে হবে)
       const [imageUrlList, docUrlList] = await Promise.all([
         this.cloudinary.uploadImages(images),
         this.cloudinary.uploadImages(docs),
       ]);
+      const tier = pcrPrefix === 'G' ? RegistryTier.GOLD : RegistryTier.BLUE;
 
-      // ৩. Database Transaction
       return await this.prisma.$transaction(async (tx) => {
         const existing = await tx.canine.findUnique({
           where: { microchipId: dto.microchipId },
         });
 
         if (existing) {
-          throw new ConflictException(
-            'Microchip ID already exists in our records',
-          );
+          throw new ConflictException('Microchip ID already exists');
         }
 
         return await tx.canine.create({
@@ -64,16 +80,27 @@ export class CanineService {
             ...dto,
             dateOfBirth: new Date(dto.dateOfBirth),
             pcrId,
+            pcrPrefix,
+            pcrBreedCode,
             pcrIncremental,
             pcrRandom,
+            tier,
             ownerId: userId,
             images: {
-              create: (imageUrlList as any).map((url: any) => ({ url })),
+              create: (imageUrlList as string[]).map((url) => ({
+                url,
+                publicId:
+                  url.split('/').pop()?.split('.')[0] ||
+                  `img-${Math.random().toString(36).substring(7)}`,
+              })),
             },
             DNAdocuments: {
-              create: (docUrlList as any).map((url: any) => ({
+              create: (docUrlList as string[]).map((url) => ({
                 url,
                 name: 'Canine DNA Report',
+                publicId:
+                  url.split('/').pop()?.split('.')[0] ||
+                  `doc-${Math.random().toString(36).substring(7)}`,
               })),
             },
           },
@@ -87,9 +114,13 @@ export class CanineService {
       });
     } catch (error: any) {
       this.logger.error(`Canine registration failed: ${error.message}`);
-
-      if (error instanceof ConflictException) throw error;
-
+      if (
+        error instanceof ConflictException ||
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         error.message || 'Failed to register canine',
       );
@@ -135,7 +166,8 @@ export class CanineService {
           include: {
             breedRelation: { select: { name: true, breedCode: true } },
             owner: { select: { fullName: true, email: true, pcrId: true } },
-            images: { take: 1 }, // লিস্টের জন্য শুধু প্রথম ইমেজটা নেয়া হচ্ছে পারফরম্যান্সের জন্য
+            images: { take: 1 },
+            // pcrId,
           },
         }),
         this.prisma.canine.count({ where }),
@@ -152,8 +184,7 @@ export class CanineService {
     }
   }
 
-  // 3. Find One Canine
-  async findOne(canineId: string) {
+  async findOne(canineId: string, currentUserId?: string, userRole?: string) {
     try {
       const canine = await this.prisma.canine.findUnique({
         where: { id: canineId },
@@ -161,7 +192,9 @@ export class CanineService {
           images: true,
           DNAdocuments: true,
           breedRelation: true,
-          owner: { select: { fullName: true, email: true, pcrId: true } },
+          owner: {
+            select: { id: true, fullName: true, email: true, pcrId: true },
+          },
           litter: { include: { breedRelation: true } },
           asMother: { select: { id: true, pcrId: true } },
           asFather: { select: { id: true, pcrId: true } },
@@ -170,6 +203,40 @@ export class CanineService {
 
       if (!canine)
         throw new NotFoundException(`Canine with ID ${canineId} not found`);
+      const isOwner = currentUserId === canine.ownerId;
+      const isAdmin = userRole === 'SUPER_ADMIN';
+
+      if (isOwner || isAdmin) {
+        return canine;
+      }
+
+      let hasApprovedRequest = false;
+      if (currentUserId) {
+        const approvedRequest = await this.prisma.canineHealthRequest.findFirst(
+          {
+            where: {
+              canineId: canine.id,
+              requesterId: currentUserId,
+              status: 'APPROVED',
+            },
+          },
+        );
+        if (approvedRequest) hasApprovedRequest = true;
+      }
+
+      if (!hasApprovedRequest) {
+        return {
+          ...canine,
+          healthStatus: 'HIDDEN (Request Access)',
+          healthNotes: 'Contact owner for health details',
+          primaryBreedDNA: 'HIDDEN',
+          secondaryBreedDNA: 'HIDDEN',
+          DNAdocuments: [],
+          vaccinations: [],
+          healthClearances: [],
+        };
+      }
+
       return canine;
     } catch (error: any) {
       this.logger.error(`Failed to find canine: ${error.message}`);
