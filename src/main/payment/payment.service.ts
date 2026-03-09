@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 import {
   Injectable,
   NotFoundException,
@@ -18,30 +18,42 @@ export class PaymentService {
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    this.stripe = new Stripe(this.configService.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2024-12-18.acacia' as any,
     });
   }
 
   async createCheckoutSession(userId: string, membershipId: string) {
     try {
-      // ক) মেম্বারশিপ প্ল্যান চেক করা
       const plan = await this.prisma.membership.findUnique({
         where: { id: membershipId },
       });
 
-      if (!plan || !plan.stripePriceId) {
-        throw new NotFoundException(
-          'Selected plan is not available for purchase.',
-        );
+      if (!plan) {
+        throw new NotFoundException('Selected plan not found.');
       }
 
-      // খ) স্ট্রাইপ চেকআউট সেশন তৈরি
+      if (plan.currentPrice <= 0) {
+        return {
+          url: `${process.env.FRONTEND_URL}/payment/success`,
+        };
+      }
+
       const session = await this.stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
           {
-            price: plan.stripePriceId,
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: plan.name,
+                description: `${plan.tier} Membership`,
+              },
+              unit_amount: Math.round(plan.currentPrice * 100),
+              recurring: {
+                interval: 'year',
+              },
+            },
             quantity: 1,
           },
         ],

@@ -1,0 +1,36 @@
+model CanineHealthRequest {
+  id              String                @id @default(uuid())
+  
+
+  requesterId     String
+  requester       User                  @relation("SentHealthRequests", fields: [requesterId], references: [id])
+
+
+  canineId    String? 
+  canine      Canine?  @relation("CanineHealthRequests", fields: [canineId], references: [id])
+
+  litterId        String?
+  litter          Litter?               @relation("LitterHealthRequests", fields: [litterId], references: [id])
+
+  ownerId         String
+  owner           User                  @relation("ReceivedHealthRequests", fields: [ownerId], references: [id])
+
+  status          HealthRequestStatus   @default(PENDING)
+
+  note            String?               @db.Text
+
+  accessDuration  Int?                  @default(7) 
+  approvedAt      DateTime?
+  
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@map("canine_health_requests")
+}
+
+enum HealthRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVOKED
+}

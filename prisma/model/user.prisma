@@ -55,6 +55,12 @@ model User {
 
   subscriptions     Subscription[]
 
+
+
+  sentHealthRequests     CanineHealthRequest[] @relation("SentHealthRequests")
+  receivedHealthRequests CanineHealthRequest[] @relation("ReceivedHealthRequests")
+  
+
   lastLogin             DateTime?           @default(now())
   createdAt             DateTime            @default(now())
   updatedAt             DateTime            @updatedAt
@@ -96,13 +102,11 @@ model AccessPermission {
 
 
 
-
 model Membership {
   id            String         @id @default(uuid())
   tier          String         @unique 
   name          String
   currentPrice  Float          @default(0)
-  stripePriceId String?        @unique 
   features      Json?
   canineLimit   Int            @default(1)
   
@@ -112,20 +116,20 @@ model Membership {
 }
 
 model Subscription {
-  id                   String   @id @default(uuid())
-  stripeSubscriptionId String   @unique
+  id                   String     @id @default(uuid())
+  stripeSubscriptionId String     @unique
   userId               String
-  user                 User     @relation(fields: [userId], references: [id])
+  user                 User       @relation(fields: [userId], references: [id])
   membershipId         String
   membership           Membership @relation(fields: [membershipId], references: [id])
 
   amountPaid           Float   
-  currency             String   @default("USD")
-  status               String   // active, canceled, past_due
+  currency             String     @default("USD")
+  status               String     // active, canceled, past_due
   
-  currentPeriodStart   DateTime @default(now())
+  currentPeriodStart   DateTime   @default(now())
   currentPeriodEnd     DateTime
   
-  createdAt            DateTime @default(now())
+  createdAt            DateTime   @default(now())
   @@map("subscriptions")
 }

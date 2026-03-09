@@ -31,14 +31,6 @@ export class CreateMembershipDto {
   currentPrice!: number;
 
   @ApiProperty({
-    example: 'price_1Q...',
-    description: 'Stripe Price ID from Dashboard',
-  })
-  @IsString()
-  @IsNotEmpty()
-  stripePriceId!: string;
-
-  @ApiProperty({
     example: 7,
     description: 'Maximum canine registrations allowed',
   })
@@ -55,7 +47,6 @@ export class CreateMembershipDto {
   features: string[] = [];
 }
 
-// প্ল্যান আপডেটের জন্য DTO
 export class UpdateMembershipDto {
   @ApiPropertyOptional()
   @IsOptional()
@@ -67,11 +58,6 @@ export class UpdateMembershipDto {
   @IsNumber()
   @Min(0)
   currentPrice?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  stripePriceId?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

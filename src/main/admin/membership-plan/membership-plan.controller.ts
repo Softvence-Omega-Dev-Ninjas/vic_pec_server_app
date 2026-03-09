@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
   Controller,
   Post,
@@ -13,21 +14,25 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MembershipPlanService } from './membership-plan.service';
 
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-import { RoleGuard } from 'src/guard/role.guard';
+// import { RoleGuard } from 'src/guard/role.guard';
 import { Roles } from 'src/decorator/roles.decorator';
-import { RoleType } from 'generated/prisma/enums';
+import { ResourceType, RoleType } from 'generated/prisma/enums';
 import {
   CreateMembershipDto,
   UpdateMembershipDto,
 } from './dto/create-membership-plan.dto';
+import { PermissionGuard } from 'src/guard/permission.guard';
+import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
+import { PermissionAction } from '../permission/permission.service';
 
 @ApiTags('Admin Membership Management')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RoleGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @Controller('admin/membership-plans')
 export class MembershipPlanController {
   constructor(private readonly planService: MembershipPlanService) {}
 
+  @CheckPermission(ResourceType.MEMBERSHIP_PLAN, PermissionAction.CREATE)
   @Post()
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Create a new plan (Max 3)' })
@@ -41,6 +46,7 @@ export class MembershipPlanController {
     return await this.planService.getAllPlans();
   }
 
+  @CheckPermission(ResourceType.MEMBERSHIP_PLAN, PermissionAction.EDIT)
   @Patch(':membershipId')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update a plan' })
@@ -51,6 +57,7 @@ export class MembershipPlanController {
     return await this.planService.updatePlan(membershipId, dto);
   }
 
+  @CheckPermission(ResourceType.MEMBERSHIP_PLAN, PermissionAction.DELETE)
   @Delete(':membershipId')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete a plan' })

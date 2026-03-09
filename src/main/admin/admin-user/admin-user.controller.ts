@@ -17,18 +17,19 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AdminUserService } from './admin-user.service';
 import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
-import { RoleType, UserStatus } from 'generated/prisma/enums';
+import { ResourceType, UserStatus } from 'generated/prisma/enums';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-import { RoleGuard } from 'src/guard/role.guard';
-import { Roles } from 'src/decorator/roles.decorator';
+import { PermissionGuard } from 'src/guard/permission.guard';
+import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
+import { PermissionAction } from '../permission/permission.service';
 
-@UseGuards(JwtAuthGuard, RoleGuard)
+@UseGuards(JwtAuthGuard, PermissionGuard)
 @ApiTags('Admin / User Management')
 @Controller('admin-user')
 export class AdminUserController {
   constructor(private readonly adminUserService: AdminUserService) {}
 
-  @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
+  @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post('create')
   @ApiOperation({ summary: 'Create a new user by Admin' })
   @ApiResponse({ status: 201, description: 'User created successfully' })
@@ -49,7 +50,7 @@ export class AdminUserController {
     }
   }
 
-  @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
+  @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post(':userId/approve')
   @ApiOperation({ summary: 'Approve a verified user' })
   @ApiResponse({ status: 200, description: 'User approved.' })
@@ -61,21 +62,21 @@ export class AdminUserController {
     return this.adminUserService.approveUser(userId);
   }
 
-  @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
+  @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post(':userId/reject')
   @ApiOperation({ summary: 'Reject a user application' })
   async reject(@Param('userId') userId: string) {
     return this.adminUserService.rejectUser(userId);
   }
 
-  @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
+  @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post(':userId/suspend')
   @ApiOperation({ summary: 'Suspend an active user account' })
   async suspend(@Param('userId') userId: string) {
     return this.adminUserService.suspendUser(userId);
   }
 
-  @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
+  @CheckPermission(ResourceType.USER, PermissionAction.VIEW)
   @Get('get-users')
   @ApiOperation({ summary: 'Get all users with search and pagination' })
   // সোয়াগারে অপশনাল দেখানোর জন্য এই ডেকোরেটরগুলো যোগ করুন
@@ -115,7 +116,7 @@ export class AdminUserController {
     });
   }
 
-  @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
+  @CheckPermission(ResourceType.USER, PermissionAction.VIEW)
   @Get('get-users/:userId')
   @ApiOperation({ summary: 'Get user details by userId' })
   async getOne(@Param('userId') userId: string) {

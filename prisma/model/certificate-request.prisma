@@ -5,8 +5,7 @@ model CertificateRequest {
   // Relation to Owner
   ownerId         String
   owner           User            @relation("UserCertRequests", fields: [ownerId], references: [id])
-
-  // Optional Relations: Ekshathe duiti thakbe na, jekono ekti thakbe
+  
   canineId        String?
   canine          Canine?         @relation("CanineCertRequests", fields: [canineId], references: [id])
   
