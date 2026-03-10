@@ -117,4 +117,40 @@ export class MailService {
       html: htmlContent,
     });
   }
+
+  async sendPasswordResetEmail(email: string, otp: string) {
+    const htmlContent = `
+    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 500px; margin: auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05); color: #333;">
+      
+      <div style="background-color: #2B4C8A; padding: 25px; text-align: center;">
+        <h2 style="color: #D4AF37; margin: 0; font-size: 22px; letter-spacing: 2px; text-transform: uppercase;">PCR REGISTRY</h2>
+      </div>
+      
+      <div style="padding: 40px; text-align: center;">
+        <h3 style="color: #2B4C8A; margin-top: 0;">Password Reset Request</h3>
+        <p style="line-height: 1.6; color: #555;">We received a request to reset your password. Use the following code to proceed. This code is valid for <strong>10 minutes</strong>.</p>
+        
+        <div style="margin: 30px 0; padding: 20px; background-color: #fff9e6; border: 2px dashed #D4AF37; border-radius: 10px;">
+          <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #2B4C8A;">${otp}</span>
+        </div>
+
+        <p style="font-size: 14px; color: #cc0000; font-weight: bold;">Security Warning:</p>
+        <p style="font-size: 13px; color: #888; margin-top: 5px;">If you did not request a password reset, please secure your account immediately or contact PCR support.</p>
+      </div>
+
+      <div style="background-color: #f4f4f4; padding: 15px; text-align: center; border-top: 1px solid #eeeeee;">
+        <p style="font-size: 11px; color: #999; margin: 0;">
+          &copy; ${new Date().getFullYear()} PCR Registry. Identity Protection System.
+        </p>
+      </div>
+    </div>
+    `;
+
+    await this.transporter.sendMail({
+      from: `"PCR Security" <${process.env.MAIL_USER}>`,
+      to: email,
+      subject: `Password Reset Code: ${otp}`,
+      html: htmlContent,
+    });
+  }
 }

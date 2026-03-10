@@ -23,12 +23,13 @@ import { PermissionGuard } from 'src/guard/permission.guard';
 import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
 import { PermissionAction } from '../permission/permission.service';
 
-@UseGuards(JwtAuthGuard, PermissionGuard)
+@UseGuards(JwtAuthGuard)
 @ApiTags('Admin / User Management')
 @Controller('admin-user')
 export class AdminUserController {
   constructor(private readonly adminUserService: AdminUserService) {}
 
+  @UseGuards(PermissionGuard)
   @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post('create')
   @ApiOperation({ summary: 'Create a new user by Admin' })
@@ -50,6 +51,7 @@ export class AdminUserController {
     }
   }
 
+  @UseGuards(PermissionGuard)
   @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post(':userId/approve')
   @ApiOperation({ summary: 'Approve a verified user' })
@@ -62,6 +64,7 @@ export class AdminUserController {
     return this.adminUserService.approveUser(userId);
   }
 
+  @UseGuards(PermissionGuard)
   @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post(':userId/reject')
   @ApiOperation({ summary: 'Reject a user application' })
@@ -69,6 +72,7 @@ export class AdminUserController {
     return this.adminUserService.rejectUser(userId);
   }
 
+  @UseGuards(PermissionGuard)
   @CheckPermission(ResourceType.USER, PermissionAction.CREATE)
   @Post(':userId/suspend')
   @ApiOperation({ summary: 'Suspend an active user account' })
@@ -76,6 +80,7 @@ export class AdminUserController {
     return this.adminUserService.suspendUser(userId);
   }
 
+  @UseGuards(PermissionGuard)
   @CheckPermission(ResourceType.USER, PermissionAction.VIEW)
   @Get('get-users')
   @ApiOperation({ summary: 'Get all users with search and pagination' })
@@ -116,6 +121,7 @@ export class AdminUserController {
     });
   }
 
+  @UseGuards(PermissionGuard)
   @CheckPermission(ResourceType.USER, PermissionAction.VIEW)
   @Get('get-users/:userId')
   @ApiOperation({ summary: 'Get user details by userId' })

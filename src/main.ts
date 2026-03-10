@@ -55,8 +55,8 @@ async function bootstrap() {
 
   // 7. Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle('ByBench Marketplace API')
-    .setDescription('The ByBench API description')
+    .setTitle('VIC_PEC Marketplace API')
+    .setDescription('The VIC_PEC API description')
     .setVersion('1.0')
     .addBearerAuth()
     .addCookieAuth('accessToken')

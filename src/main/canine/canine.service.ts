@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -255,7 +256,7 @@ export class CanineService {
     try {
       const existingCanine = await this.findOne(canineId);
 
-      // Ownership Check: Only Owner or Admin can update
+      // Ownership Check
       if (role !== 'SUPER_ADMIN' && existingCanine.ownerId !== userId) {
         throw new ConflictException(
           'You do not have permission to update this canine',
@@ -270,11 +271,17 @@ export class CanineService {
           throw new ConflictException('Microchip ID already in use');
       }
 
+      // 1. Destructure fields that are not part of the database columns or need special handling
+      const { images, DNAdocuments, dateOfBirth, ...updateData } = dto;
+
       return await this.prisma.canine.update({
         where: { id: canineId },
         data: {
-          ...dto,
-          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+          ...updateData,
+          // 2. Explicitly handle Date conversion
+          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+          // Note: Images and Documents update logic separate thaka bhalo,
+          // kintu ekhane error solve korte hole egulo data object theke exclude korte hobe.
         },
       });
     } catch (error: any) {

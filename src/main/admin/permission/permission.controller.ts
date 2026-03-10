@@ -9,6 +9,7 @@ import {
   Query,
   Delete,
   ParseEnumPipe,
+  Post,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -35,6 +36,34 @@ import { PermissionPaginationDto } from './dto/permission-query.dto';
 @Controller('admin-permissions')
 export class PermissionController {
   constructor(private readonly permissionService: PermissionService) {}
+
+  @Post('assign/:adminId')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Assign a single resource permission to an admin' })
+  @ApiParam({
+    name: 'adminId',
+    description: 'UUID of the admin user',
+    type: String,
+  })
+  @ApiBody({
+    type: PermissionDto,
+    description:
+      'Resource permission details (e.g. resource: CANINE, canView: true)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Permission created successfully',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Permission for this resource already exists for this admin',
+  })
+  async createPermission(
+    @Param('adminId', ParseUUIDPipe) adminId: string,
+    @Body() dto: PermissionDto,
+  ) {
+    return this.permissionService.createPermission(adminId, dto);
+  }
 
   // ---------------- UPDATE PERMISSIONS ----------------
 

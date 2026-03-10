@@ -25,6 +25,7 @@ import {
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+import { ResetPasswordDto } from './dto/reset-otp.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -105,5 +106,17 @@ export class UserController {
     }
 
     return this.userService.getMe(id);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset OTP' })
+  async forgotPassword(@Body('email') email: string) {
+    return this.userService.forgotPassword(email);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password using OTP' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.userService.resetPassword(dto);
   }
 }
