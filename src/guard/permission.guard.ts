@@ -32,9 +32,11 @@ export class PermissionGuard implements CanActivate {
     if (!check) return true;
 
     const request = context.switchToHttp().getRequest();
-    const userId = request.userId;
 
-    if (userId) {
+    const user = request.user;
+    const userId = user?.userId || user?.id;
+
+    if (!userId) {
       throw new UnauthorizedException('User not authenticated');
     }
 
@@ -52,17 +54,16 @@ export class PermissionGuard implements CanActivate {
       throw new ForbiddenException('User not found');
     }
 
+    if (dbUser.roleType === 'SUPER_ADMIN') {
+      return true;
+    }
+
     if (dbUser.status !== 'ACTIVE') {
       throw new ForbiddenException('Your account is not active');
     }
 
     if (!dbUser.isVerified) {
       throw new ForbiddenException('Your account is not verified');
-    }
-
-    // SUPER ADMIN bypass
-    if (dbUser.roleType === 'SUPER_ADMIN') {
-      return true;
     }
 
     const hasAccess = await this.permissionService.hasAccess(

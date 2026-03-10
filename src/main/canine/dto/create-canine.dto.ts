@@ -6,8 +6,14 @@ import {
   IsNumber,
   IsDateString,
   IsNotEmpty,
+  IsArray,
 } from 'class-validator';
-import { Gender, RegistrationRequestType } from 'generated/prisma/enums';
+import {
+  Gender,
+  RegistrationRequestType,
+  VaccinationType,
+  HealthClearance,
+} from 'generated/prisma/enums';
 import { PartialType } from '@nestjs/swagger';
 
 export class RegisterCanineDto {
@@ -62,6 +68,29 @@ export class RegisterCanineDto {
   @IsString()
   secondaryBreedDNA?: string;
 
+  // New Health Related Fields
+  @ApiPropertyOptional({ example: 'Excellent' })
+  @IsOptional()
+  @IsString()
+  healthStatus?: string;
+
+  @ApiPropertyOptional({ enum: VaccinationType, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(VaccinationType, { each: true })
+  vaccinations?: VaccinationType[];
+
+  @ApiPropertyOptional({ enum: HealthClearance, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(HealthClearance, { each: true })
+  healthClearances?: HealthClearance[];
+
+  @ApiPropertyOptional({ example: 'Any additional health information...' })
+  @IsOptional()
+  @IsString()
+  healthNotes?: string;
+
   // Location fields
   @ApiProperty({ example: 'Dallas' }) @IsString() @IsNotEmpty() city!: string;
   @ApiProperty({ example: 'TX' }) @IsString() @IsNotEmpty() state!: string;
@@ -72,6 +101,17 @@ export class RegisterCanineDto {
   @IsOptional()
   @IsEnum(RegistrationRequestType)
   requestType?: RegistrationRequestType;
+
+  // For handling multiple images/files in the service
+  @ApiPropertyOptional({ type: 'string', format: 'binary', isArray: true })
+  @IsOptional()
+  @IsArray()
+  images?: any[];
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary', isArray: true })
+  @IsOptional()
+  @IsArray()
+  DNAdocuments?: any[];
 }
 
 export class UpdateCanineDto extends PartialType(RegisterCanineDto) {}

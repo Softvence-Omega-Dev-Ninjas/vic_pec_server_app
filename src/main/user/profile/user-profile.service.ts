@@ -16,6 +16,7 @@ import {
   UpdateSettingsDto,
 } from './dto/user-profile.dto';
 import { UserService } from '../user.service';
+// import { MailService } from 'src/main/mail/mail.service';
 
 @Injectable()
 export class UserProfileService {

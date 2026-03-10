@@ -17,6 +17,7 @@ import { MailService } from '../mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { LoginDto } from './dto/login.dto';
+import { ResetPasswordDto } from './dto/reset-otp.dto';
 
 @Injectable()
 export class UserService {
@@ -60,6 +61,7 @@ export class UserService {
         isVerified: false,
         membershipId: null, // Membership is optional at registration
         otpAttempts: 0,
+        roleType: 'OWNER',
       },
     });
 
@@ -171,11 +173,12 @@ export class UserService {
 
     return res.send({
       success: true,
-      message: 'Login successful',
+      message: `Welcome back ${user.fullName}`,
       user: {
         email: user.email,
         fullName: user.fullName,
         pcrId: user.pcrId,
+        roleType: user.roleType,
       },
     });
   }
@@ -246,6 +249,65 @@ export class UserService {
     return {
       success: true,
       data: result,
+    };
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('User not found with this email.');
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { email },
+      data: {
+        otp,
+        otpExpires,
+        otpAttempts: 0,
+        otpLockUntil: null,
+      },
+    });
+
+    await this.mailService.sendPasswordResetEmail(user.email, otp);
+
+    return {
+      success: true,
+      message: 'A password reset code has been sent to your email.',
+    };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (!user) throw new NotFoundException('User not found.');
+
+    if (
+      !user.otp ||
+      !user.otpExpires ||
+      new Date() > user.otpExpires ||
+      user.otp !== dto.otp
+    ) {
+      throw new BadRequestException('Invalid or expired reset code.');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+
+    await this.prisma.user.update({
+      where: { email: dto.email },
+      data: {
+        password: hashedPassword,
+        otp: null,
+        otpExpires: null,
+        otpAttempts: 0,
+      },
+    });
+
+    return {
+      success: true,
+      message:
+        'Password reset successful. You can now login with your new password.',
     };
   }
 }
