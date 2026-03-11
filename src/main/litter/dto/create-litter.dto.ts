@@ -6,8 +6,14 @@ import {
   IsOptional,
   IsEnum,
   IsNumber,
+  IsArray,
 } from 'class-validator';
-import { Gender } from 'generated/prisma/enums';
+import {
+  Gender,
+  HealthClearance,
+  RegistrationRequestType,
+  VaccinationType,
+} from 'generated/prisma/enums';
 import { PartialType } from '@nestjs/swagger';
 
 export class CreateLitterDto {
@@ -60,11 +66,49 @@ export class CreateLitterDto {
   @IsString()
   fatherPcrId?: string;
 
+  // New Health Related Fields
+  @ApiPropertyOptional({ example: 'Excellent' })
+  @IsOptional()
+  @IsString()
+  healthStatus?: string;
+
+  @ApiPropertyOptional({ enum: VaccinationType, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(VaccinationType, { each: true })
+  vaccinations?: VaccinationType[];
+
+  @ApiPropertyOptional({ enum: HealthClearance, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(HealthClearance, { each: true })
+  healthClearances?: HealthClearance[];
+
+  @ApiPropertyOptional({ example: 'Any additional health information...' })
+  @IsOptional()
+  @IsString()
+  healthNotes?: string;
+
   // Location data
   @ApiProperty({ example: 'Dallas' }) @IsString() @IsNotEmpty() city!: string;
   @ApiProperty({ example: 'TX' }) @IsString() @IsNotEmpty() state!: string;
   @ApiProperty({ example: '75201' }) @IsString() @IsNotEmpty() zipCode!: string;
   @ApiProperty({ example: 'USA' }) @IsString() @IsNotEmpty() country!: string;
+
+  // @ApiProperty({ example: 'German Shepherd' })
+  // @IsNotEmpty()
+  // @IsString()
+  // primaryBreedDNA!: string;
+
+  // @ApiPropertyOptional({ example: 'Husky' })
+  // @IsOptional()
+  // @IsString()
+  // secondaryBreedDNA?: string;
+
+  @ApiPropertyOptional({ enum: RegistrationRequestType })
+  @IsOptional()
+  @IsEnum(RegistrationRequestType)
+  requestType?: RegistrationRequestType;
 }
 
 export class UpdateLitterDto extends PartialType(CreateLitterDto) {}

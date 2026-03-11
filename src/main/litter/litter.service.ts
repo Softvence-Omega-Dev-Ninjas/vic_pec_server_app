@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -50,6 +51,49 @@ export class LitterService {
           },
         });
 
+        if (dto.motherPcrId || dto.fatherPcrId) {
+          const parentPcrIds = [dto.motherPcrId, dto.fatherPcrId].filter(
+            Boolean,
+          ) as string[];
+
+          const parents = await this.prisma.canine.findMany({
+            where: { pcrId: { in: parentPcrIds } },
+            select: { pcrId: true, gender: true },
+          });
+
+          parents.forEach((parent) => {
+            if (
+              parent.pcrId === dto.motherPcrId &&
+              parent.gender !== 'FEMALE'
+            ) {
+              throw new BadRequestException(
+                `Canine ${parent.pcrId} is not a Female and cannot be a mother`,
+              );
+            }
+            if (parent.pcrId === dto.fatherPcrId && parent.gender !== 'MALE') {
+              throw new BadRequestException(
+                `Canine ${parent.pcrId} is not a Male and cannot be a father`,
+              );
+            }
+          });
+
+          // 3. Designer breed ancestor check (F1 validation)
+          if (breed.type === 'DESIGNER' && dto.generation !== 'F1') {
+            const f1Ancestor = await this.prisma.canine.findFirst({
+              where: {
+                pcrId: { in: parentPcrIds },
+                generation: 'F1',
+              },
+            });
+
+            if (!f1Ancestor && parentPcrIds.length > 0) {
+              throw new BadRequestException(
+                'Registration rejected: Later generations must trace back to a registered F1 ancestor',
+              );
+            }
+          }
+        }
+
         if (!f1Ancestor && parentPcrIds.length > 0) {
           throw new BadRequestException(
             'Registration rejected: Any later generations (F1B, F2, VD) must trace back to a registered F1 ancestor',
@@ -99,12 +143,18 @@ export class LitterService {
             dateOfBirth: new Date(dto.dateOfBirth),
             ownerId: userId,
             images: {
-              create: (imageUrlList as any).map((url: any) => ({ url })),
+              create: (imageUrlList as any)
+                .filter((img: any) => img?.url && img?.publicId)
+                .map((img: any) => ({
+                  url: img.url,
+                  publicId: img.publicId,
+                })),
             },
+
             DNAdocuments: {
-              create: (docUrlList as any).map((url: any) => ({
-                url,
-                name: 'Litter DNA Document',
+              create: docUrlList.map((doc: any) => ({
+                url: doc.url,
+                publicId: doc.publicId,
               })),
             },
           },
