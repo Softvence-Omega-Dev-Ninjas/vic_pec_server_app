@@ -1,7 +1,18 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsEnum, IsInt, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsInt,
+  Min,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { Gender } from 'generated/prisma/enums';
+import {
+  Gender,
+  RegistryTier,
+  CertificateRequestStatus,
+} from 'generated/prisma/enums';
 
 export class CanineQueryDto {
   @ApiPropertyOptional({ example: 1 })
@@ -28,10 +39,30 @@ export class CanineQueryDto {
   @IsString()
   breedId?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by Breed Name' })
+  @IsOptional()
+  @IsString()
+  breedName?: string;
+
   @ApiPropertyOptional({ enum: Gender })
   @IsOptional()
   @IsEnum(Gender)
   gender?: Gender;
+
+  @ApiPropertyOptional({ enum: RegistryTier })
+  @IsOptional()
+  @IsEnum(RegistryTier)
+  tier?: RegistryTier;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiPropertyOptional({ enum: CertificateRequestStatus })
+  @IsOptional()
+  @IsEnum(CertificateRequestStatus)
+  status?: CertificateRequestStatus;
 
   @ApiPropertyOptional({ example: 'createdAt' })
   @IsOptional()
@@ -40,6 +71,6 @@ export class CanineQueryDto {
 
   @ApiPropertyOptional({ example: 'desc' })
   @IsOptional()
-  @IsString()
+  @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc' = 'desc';
 }

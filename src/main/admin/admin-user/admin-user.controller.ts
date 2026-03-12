@@ -12,6 +12,8 @@ import {
   Get,
   Query,
   UseGuards,
+  Delete,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -127,5 +129,26 @@ export class AdminUserController {
   @ApiOperation({ summary: 'Get user details by userId' })
   async getOne(@Param('userId') userId: string) {
     return this.adminUserService.getUserById(userId);
+  }
+
+  // admin-user.controller.ts এ যোগ করুন
+  @UseGuards(PermissionGuard)
+  @CheckPermission(ResourceType.USER, PermissionAction.DELETE)
+  @Delete(':userId')
+  @ApiOperation({ summary: 'Delete a user' })
+  async delete(@Param('userId') userId: string) {
+    return this.adminUserService.deleteUser(userId);
+  }
+
+  // admin-user.controller.ts
+  @UseGuards(PermissionGuard)
+  @CheckPermission(ResourceType.USER, PermissionAction.EDIT)
+  @Patch(':userId')
+  @ApiOperation({ summary: 'Update user profile' })
+  async update(
+    @Param('userId') userId: string,
+    @Body() dto: Partial<CreateUserByAdminDto>,
+  ) {
+    return this.adminUserService.updateUser(userId, dto);
   }
 }

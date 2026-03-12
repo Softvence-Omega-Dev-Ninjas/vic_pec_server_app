@@ -25,6 +25,8 @@ import { StripeWebhookModule } from './main/stripe-webhook/stripe-webhook.module
 import { RequestHelthReportModule } from './main/request-helth-report/request-helth-report.module';
 import { StatsAndTireModule } from './main/admin/stats-and-tire/stats-and-tire.module';
 import { PermissionService } from './main/admin/permission/permission.service';
+import { AdminCanineModule } from './main/admin/admin-canine/admin-canine.module';
+import { AdminLitterModule } from './main/admin/admin-litter/admin-litter.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -50,6 +52,8 @@ import { PermissionService } from './main/admin/permission/permission.service';
     StripeWebhookModule,
     RequestHelthReportModule,
     StatsAndTireModule,
+    AdminCanineModule,
+    AdminLitterModule,
   ],
   controllers: [AppController],
   providers: [

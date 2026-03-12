@@ -59,7 +59,7 @@ model Canine {
 
 
   requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
-  status            CertificateRequestStatus       @default(PENDING) 
+  status            CanineStatus       @default(PENDING) 
   assignedTier      VerificationType    @default(NONE)  
 
   certificateRequests CertificateRequest[] @relation("CanineCertRequests") 
