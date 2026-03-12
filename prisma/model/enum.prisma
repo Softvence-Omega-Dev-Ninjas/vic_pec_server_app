@@ -39,6 +39,13 @@ enum VerificationType {
 
 
 
+enum CanineStatus {
+  PENDING
+  APPROVED
+  DECLINE
+  UNDER_REVIEW
+}
+
 enum CertificateRequestStatus {
   PENDING
   APPROVED

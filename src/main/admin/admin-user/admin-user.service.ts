@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -38,7 +37,12 @@ export class AdminUserService {
         dto.password || `pcr${Math.floor(1000 + Math.random() * 9000)}`;
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-      const prefix = dto.roleType === RoleType.OWNER ? 'OW' : 'PA';
+      const prefix =
+        dto.roleType === RoleType.OWNER
+          ? 'OW'
+          : dto.roleType === RoleType.ADMIN
+            ? 'AD'
+            : 'PA';
 
       const lastUser = await this.prisma.user.findFirst({
         where: { pcrPrefix: prefix },
@@ -181,6 +185,7 @@ export class AdminUserService {
         include: {
           membership: true,
           profileImage: true,
+          canines: true,
         },
       }),
     ]);
@@ -215,6 +220,50 @@ export class AdminUserService {
     const { password, otp, otpExpires, ...result } = user;
     return {
       success: true,
+      data: result,
+    };
+  }
+
+  async deleteUser(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return {
+      success: true,
+      message: 'User and associated data deleted successfully.',
+    };
+  }
+
+  async updateUser(userId: string, dto: Partial<CreateUserByAdminDto>) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (dto.email && dto.email !== user.email) {
+      const emailExists = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+      if (emailExists) throw new BadRequestException('Email already in use');
+    }
+
+    const updateData: any = { ...dto };
+
+    if (dto.password) {
+      throw new BadRequestException("You can't change password");
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    const { password, ...result } = updatedUser;
+    return {
+      success: true,
+      message: 'User updated successfully',
       data: result,
     };
   }

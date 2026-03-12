@@ -96,4 +96,18 @@ export class CanineController {
   async remove(@Param('canineId') canineId: string, @Req() req: any) {
     return await this.canineService.remove(canineId, req.userId, req.user.role);
   }
+
+  @Get('/owner/my-canines')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get current user registered canines' })
+  async findMyCanines(@Req() req: any, @Query() query: CanineQueryDto) {
+    return await this.canineService.findMyCanines(req.userId, query);
+  }
+
+  @Get('owner/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get canine statistics for the logged-in owner' })
+  async getOwnerStats(@Req() req: any) {
+    return await this.canineService.getOwnerStats(req.userId);
+  }
 }

@@ -138,12 +138,18 @@ export class CanineService {
         sortBy,
         sortOrder,
         breedId,
+        breedName,
         gender,
+        tier,
+        color,
+        status,
       } = query;
+
       const skip = (page - 1) * limit;
 
       const where: any = {
         AND: [
+          // Global Search
           search
             ? {
                 OR: [
@@ -153,8 +159,20 @@ export class CanineService {
                 ],
               }
             : {},
+          // Specific Filters
           breedId ? { breedId } : {},
           gender ? { gender } : {},
+          tier ? { tier } : {},
+          status ? { status } : {},
+          color ? { color: { contains: color, mode: 'insensitive' } } : {},
+          // Nested Breed Name Filter
+          breedName
+            ? {
+                breedRelation: {
+                  name: { contains: breedName, mode: 'insensitive' },
+                },
+              }
+            : {},
         ],
       };
 
@@ -168,7 +186,6 @@ export class CanineService {
             breedRelation: { select: { name: true, breedCode: true } },
             owner: { select: { fullName: true, email: true, pcrId: true } },
             images: { take: 1 },
-            // pcrId,
           },
         }),
         this.prisma.canine.count({ where }),
@@ -177,7 +194,12 @@ export class CanineService {
       return {
         success: true,
         data,
-        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
       };
     } catch (error: any) {
       this.logger.error(`Failed to fetch canines: ${error.message}`);
@@ -333,6 +355,131 @@ export class CanineService {
       )
         throw error;
       throw new InternalServerErrorException('Could not delete canine');
+    }
+  }
+
+  async findMyCanines(ownerId: string, query: CanineQueryDto) {
+    try {
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+        breedId,
+        breedName,
+        gender,
+        tier,
+        color,
+        status,
+      } = query;
+
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        AND: [
+          { ownerId }, // Force filter by logged-in user
+          search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: 'insensitive' } },
+                  { pcrId: { contains: search, mode: 'insensitive' } },
+                  { microchipId: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+          breedId ? { breedId } : {},
+          gender ? { gender } : {},
+          tier ? { tier } : {},
+          status ? { status } : {},
+          color ? { color: { contains: color, mode: 'insensitive' } } : {},
+          breedName
+            ? {
+                breedRelation: {
+                  name: { contains: breedName, mode: 'insensitive' },
+                },
+              }
+            : {},
+        ],
+      };
+
+      const [data, total] = await Promise.all([
+        this.prisma.canine.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            breedRelation: { select: { name: true, breedCode: true } },
+            owner: { select: { fullName: true, email: true, pcrId: true } },
+            images: { take: 1 },
+          },
+        }),
+        this.prisma.canine.count({ where }),
+      ]);
+
+      return {
+        success: true,
+        data,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch my canines: ${error.message}`);
+      throw new InternalServerErrorException('Could not retrieve your canines');
+    }
+  }
+
+  async getOwnerStats(ownerId: string) {
+    try {
+      // Shob count eksathe fetch korar jonno promise setup
+      const [total, statsByTier, statsByStatus] = await Promise.all([
+        // 1. Total Published (Approved status)
+        this.prisma.canine.count({
+          where: { ownerId, status: 'APPROVED' },
+        }),
+        // 2. Count by Tier (Gold vs Blue)
+        this.prisma.canine.groupBy({
+          by: ['tier'],
+          where: { ownerId, status: 'APPROVED' },
+          _count: { _all: true },
+        }),
+        // 3. Count by Status (Pending, Decline)
+        this.prisma.canine.groupBy({
+          by: ['status'],
+          where: { ownerId },
+          _count: { _all: true },
+        }),
+      ]);
+
+      // Array result ke object e convert kora frontend logic simplify korar jonno
+      const tierCounts = statsByTier.reduce((acc, curr) => {
+        acc[curr.tier] = curr._count._all;
+        return acc;
+      }, {});
+
+      const statusCounts = statsByStatus.reduce((acc, curr) => {
+        acc[curr.status] = curr._count._all;
+        return acc;
+      }, {});
+
+      return {
+        success: true,
+        data: {
+          totalPublished: total || 0,
+          goldVerified: tierCounts['GOLD'] || 0,
+          blueVerified: tierCounts['BLUE'] || 0,
+          pending: statusCounts['PENDING'] || 0,
+          rejected: statusCounts['DECLINE'] || 0,
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(`Error fetching owner stats: ${error.message}`);
+      throw new InternalServerErrorException('Could not retrieve statistics');
     }
   }
 }
