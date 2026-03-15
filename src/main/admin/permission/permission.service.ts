@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import {
@@ -170,15 +171,17 @@ export class PermissionService {
   }
 
   // ---------------- GET ADMINS WITH PERMISSIONS ----------------
-
   async getAllAdminsWithPermissions(query: PermissionPaginationDto) {
     const page = query.page || 1;
     const limit = Math.min(query.limit || 10, 100);
-
     const skip = (page - 1) * limit;
 
     const where = {
       roleType: RoleType.ADMIN,
+      // Sudhu jader permission table-e data ache tader get korbe
+      permissions: {
+        some: {},
+      },
       ...(query.search && {
         OR: [
           {
@@ -210,6 +213,9 @@ export class PermissionService {
           fullName: true,
           email: true,
           status: true,
+          roleType: true,
+          lastLogin: true,
+          pcrId: true,
           permissions: {
             select: {
               resource: true,
@@ -266,6 +272,97 @@ export class PermissionService {
     } catch (error: any) {
       this.logger.error(`Delete permission failed`, error.stack);
       throw error;
+    }
+  }
+
+  async getMyPermissions(userId: string) {
+    const permissions = await this.prisma.accessPermission.findMany({
+      where: { userId },
+      select: {
+        resource: true,
+        canView: true,
+        canCreate: true,
+        canEdit: true,
+        canDelete: true,
+      },
+    });
+
+    return permissions;
+  }
+
+  // ---------------- GET ALL ADMINS (EXCLUDING SUPER_ADMIN) ----------------
+  async getAllAdmins() {
+    try {
+      const admins = await this.prisma.user.findMany({
+        where: {
+          roleType: RoleType.ADMIN,
+        },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          status: true,
+          pcrId: true,
+          lastLogin: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      return admins;
+    } catch (error) {
+      this.logger.error('Error fetching admins', error);
+      throw new InternalServerErrorException('Failed to fetch admin list');
+    }
+  }
+
+  async deleteAllAdminPermissions(adminId: string) {
+    // console-e request start log
+    console.log(
+      `[PermissionService] Initiating mass delete for adminId: ${adminId}`,
+    );
+
+    try {
+      const admin = await this.prisma.user.findUnique({
+        where: { id: adminId },
+        include: { _count: { select: { permissions: true } } },
+      });
+
+      if (!admin) {
+        console.error(`[PermissionService] Error: Admin ${adminId} not found`);
+        this.logger.warn(`Admin user not found: ${adminId}`);
+        throw new NotFoundException('Admin user not found');
+      }
+
+      const deleteCount = await this.prisma.accessPermission.deleteMany({
+        where: { userId: adminId },
+      });
+
+      // Success Log
+      console.log(
+        `[PermissionService] Success: Deleted ${deleteCount.count} permissions for ${admin.fullName}`,
+      );
+      this.logger.log(`Permissions cleared for ${admin.fullName} (${adminId})`);
+
+      return {
+        success: true,
+        message: `All permissions (${admin._count.permissions}) removed for ${admin.fullName}`,
+      };
+    } catch (error: any) {
+      // console log for deep debugging
+      console.error(`[PermissionService] CRITICAL ERROR:`, {
+        adminId,
+        errorMessage: error.message,
+        stack: error.stack,
+      });
+
+      this.logger.error(`Delete all permissions failed`, error.stack);
+
+      if (error instanceof NotFoundException) throw error;
+      throw new InternalServerErrorException(
+        'Failed to clear admin permissions',
+      );
     }
   }
 }

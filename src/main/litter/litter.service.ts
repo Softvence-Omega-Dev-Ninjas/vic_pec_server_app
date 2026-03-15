@@ -390,4 +390,49 @@ export class LitterService {
       );
     }
   }
+
+  async getMyLitters(userId: string, query: LitterQueryDto) {
+    try {
+      const { page = 1, limit = 10, search, breedCode } = query;
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        ownerId: userId,
+        AND: [
+          search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: 'insensitive' } },
+                  { pcrId: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+          breedCode ? { pcrBreedCode: breedCode } : {},
+        ],
+      };
+
+      const [data, total] = await Promise.all([
+        this.prisma.litter.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            _count: { select: { puppies: true } },
+            breedRelation: { select: { name: true } },
+          },
+        }),
+        this.prisma.litter.count({ where }),
+      ]);
+
+      return {
+        success: true,
+        data,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    } catch (error) {
+      console.log(error);
+      throw new InternalServerErrorException('Failed to fetch your litters');
+    }
+  }
 }

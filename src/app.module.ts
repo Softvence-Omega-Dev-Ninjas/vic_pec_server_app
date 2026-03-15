@@ -27,6 +27,7 @@ import { StatsAndTireModule } from './main/admin/stats-and-tire/stats-and-tire.m
 import { PermissionService } from './main/admin/permission/permission.service';
 import { AdminCanineModule } from './main/admin/admin-canine/admin-canine.module';
 import { AdminLitterModule } from './main/admin/admin-litter/admin-litter.module';
+import { AdminOwnerTransferModule } from './main/admin/admin-owner-transfer/admin-owner-transfer.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -54,6 +55,7 @@ import { AdminLitterModule } from './main/admin/admin-litter/admin-litter.module
     StatsAndTireModule,
     AdminCanineModule,
     AdminLitterModule,
+    AdminOwnerTransferModule,
   ],
   controllers: [AppController],
   providers: [

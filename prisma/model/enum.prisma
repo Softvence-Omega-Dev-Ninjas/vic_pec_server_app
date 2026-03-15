@@ -58,12 +58,6 @@ enum CertificateType {
   PEDIGREE
 }
 
-enum TransferOwnershipStatus {
-  PENDING
-  SUCCESSFUL 
-  FAILED    
-  EXPIRED   
-}
 
 
 enum ReportStatus {

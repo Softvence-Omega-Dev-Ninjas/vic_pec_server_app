@@ -38,6 +38,7 @@ model User {
   // Ownership Transfers
   sentTransfers         OwnershipTransfer[] @relation("SentTransfers")
   receivedTransfers     OwnershipTransfer[] @relation("ReceivedTransfers")
+  transferRequests   TransferRequest[]
 
   // Membership & Role
   membershipId          String?

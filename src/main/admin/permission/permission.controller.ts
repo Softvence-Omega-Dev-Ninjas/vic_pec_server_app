@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Controller,
   Get,
@@ -10,6 +12,7 @@ import {
   Delete,
   ParseEnumPipe,
   Post,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -124,7 +127,7 @@ export class PermissionController {
 
   // ---------------- REVOKE RESOURCE ACCESS ----------------
 
-  @Delete(':adminId/:resource')
+  @Delete('resource/:adminId/:resource')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({
     summary: 'Remove a specific resource permission from an admin',
@@ -146,5 +149,35 @@ export class PermissionController {
     resource: ResourceType,
   ) {
     return this.permissionService.deleteResourcePermission(adminId, resource);
+  }
+
+  @Roles(RoleType.ADMIN)
+  @Get('my-permissions')
+  @ApiOperation({ summary: 'Get current logged-in admin permissions' })
+  @ApiResponse({ status: 200, description: 'Returns list of permissions' })
+  async getMyPermissions(@Req() req: any) {
+    // Note: Request object theke user id neoa tai best practice (e.g., req.user.id)
+    return this.permissionService.getMyPermissions(req.userId);
+  }
+
+  @Get('admins')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get list of all users with ADMIN role' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns a list of admins',
+  })
+  async getAdmins() {
+    return this.permissionService.getAllAdmins();
+  }
+
+  @Delete('all-admin/:adminId')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Remove all permissions from a specific admin' })
+  async clearAdminPermissions(
+    @Param('adminId', ParseUUIDPipe) adminId: string,
+  ) {
+    console.log(`[Controller] Deleting all permissions for: ${adminId}`);
+    return await this.permissionService.deleteAllAdminPermissions(adminId);
   }
 }
