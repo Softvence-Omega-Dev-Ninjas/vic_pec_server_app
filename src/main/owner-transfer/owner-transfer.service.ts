@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -10,18 +12,22 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 
-import { TransferOwnershipStatus } from 'generated/prisma/enums';
+import { CanineStatus, TransferOwnershipStatus } from 'generated/prisma/enums';
 import {
   ClaimTransferDto,
   CreateTransferDto,
   TransferQueryDto,
 } from './dto/create-transfer.dto';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class OwnershipTransferService {
   private readonly logger = new Logger(OwnershipTransferService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
   async createTransferRequest(userId: string, dto: CreateTransferDto) {
     try {
@@ -33,56 +39,93 @@ export class OwnershipTransferService {
         );
       }
 
+      // 1. Initial Validation
       if (canineId) {
         const canine = await this.prisma.canine.findUnique({
           where: { id: canineId },
         });
         if (!canine) throw new NotFoundException('Canine not found');
-        if (canine.ownerId !== userId) {
-          throw new ConflictException('You do not own this canine to transfer');
+        if (canine.ownerId !== userId)
+          throw new ConflictException('You do not own this canine');
+        if (canine.status !== CanineStatus.APPROVED) {
+          throw new BadRequestException(
+            `Cannot transfer a canine with status: ${canine.status}`,
+          );
         }
-      } else if (litterId) {
+      } else {
         const litter = await this.prisma.litter.findUnique({
           where: { id: litterId },
         });
         if (!litter) throw new NotFoundException('Litter not found');
-        if (litter.ownerId !== userId) {
-          throw new ConflictException('You do not own this litter to transfer');
+        if (litter.ownerId !== userId)
+          throw new ConflictException('You do not own this litter');
+        if (litter.status !== CanineStatus.APPROVED) {
+          throw new BadRequestException(
+            `Cannot transfer a litter with status: ${litter.status}`,
+          );
         }
       }
 
-      const existingPending = await this.prisma.ownershipTransfer.findFirst({
-        where: {
-          OR: [{ canineId }, { litterId }],
-          status: TransferOwnershipStatus.PENDING,
-        },
-      });
-
-      if (existingPending) {
-        throw new ConflictException(
-          'A transfer request is already pending for this item',
-        );
-      }
-
       const transferCode = `TRF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 24);
 
-      return await this.prisma.ownershipTransfer.create({
-        data: {
-          transferCode,
-          canineId,
-          litterId,
-          currentOwnerId: userId,
-          expiresAt,
-          status: TransferOwnershipStatus.PENDING,
-        },
-        include: {
-          canine: { select: { name: true, pcrId: true } },
-          litter: { select: { name: true, pcrId: true } },
-        },
+      // 2. Transaction for cleanup and creation
+      const transfer = await this.prisma.$transaction(async (tx) => {
+        const existingPending = await tx.ownershipTransfer.findFirst({
+          where: {
+            OR: [
+              { canineId: canineId || undefined },
+              { litterId: litterId || undefined },
+            ],
+            status: TransferOwnershipStatus.PENDING,
+          },
+        });
+
+        if (existingPending) {
+          await tx.ownershipTransfer.delete({
+            where: { id: existingPending.id },
+          });
+        }
+
+        return await tx.ownershipTransfer.create({
+          data: {
+            transferCode,
+            canineId,
+            litterId,
+            currentOwnerId: userId,
+            expiresAt,
+            isVerified: false,
+            status: TransferOwnershipStatus.PENDING,
+          },
+          include: {
+            // Ekhane canine/litter er bhetorer owner relation load kora hocche
+            canine: {
+              include: { owner: { select: { email: true, fullName: true } } },
+            },
+            litter: {
+              include: { owner: { select: { email: true, fullName: true } } },
+            },
+          },
+        });
       });
+
+      // 3. Extracting owner info from the Item (Canine or Litter)
+      const ownerInfo = transfer.canine?.owner || transfer.litter?.owner;
+      const itemName = transfer.canine?.name || transfer.litter?.name || 'Item';
+      const pcrId = transfer.canine?.pcrId || transfer.litter?.pcrId || 'N/A';
+      console.log(ownerInfo?.email);
+      if (ownerInfo?.email) {
+        await this.mailService.sendTransferCodeEmail(
+          ownerInfo.email,
+          ownerInfo.fullName,
+          itemName,
+          pcrId,
+          transferCode,
+        );
+      }
+
+      return transfer;
     } catch (error: any) {
       this.logger.error(`Transfer request failed: ${error.message}`);
       if (
@@ -103,14 +146,13 @@ export class OwnershipTransferService {
       const transfer = await this.prisma.ownershipTransfer.findUnique({
         where: { transferCode },
         include: {
-          canine: true,
-          litter: true,
+          canine: { select: { name: true, pcrId: true } },
+          litter: { select: { name: true, pcrId: true } },
+          requests: true,
         },
       });
 
-      if (!transfer) {
-        throw new NotFoundException('Invalid transfer code');
-      }
+      if (!transfer) throw new NotFoundException('Invalid transfer code');
 
       if (transfer.status !== TransferOwnershipStatus.PENDING) {
         throw new BadRequestException('This transfer is no longer active');
@@ -119,58 +161,57 @@ export class OwnershipTransferService {
       if (new Date() > transfer.expiresAt) {
         await this.prisma.ownershipTransfer.update({
           where: { id: transfer.id },
-          data: { status: TransferOwnershipStatus.EXPIRED },
+          data: { status: TransferOwnershipStatus.DECLINE },
         });
-        throw new BadRequestException('Transfer code has expired');
+        throw new BadRequestException('Transfer code expired');
       }
 
       if (transfer.currentOwnerId === newUserId) {
         throw new BadRequestException('You are already the owner of this item');
       }
 
-      return await this.prisma.$transaction(async (tx) => {
-        await tx.ownershipTransfer.update({
-          where: { id: transfer.id },
-          data: {
-            newOwnerId: newUserId,
-            status: TransferOwnershipStatus.SUCCESSFUL,
+      const hasAlreadyRequested = transfer.requests.some(
+        (req) => req.userId === newUserId,
+      );
+      if (hasAlreadyRequested) {
+        throw new ConflictException('You have already claimed this transfer');
+      }
+
+      const updatedTransfer = await this.prisma.ownershipTransfer.update({
+        where: { id: transfer.id },
+        data: {
+          isVerified: true,
+          verifiedAt: transfer.verifiedAt || new Date(),
+          requests: {
+            create: {
+              userId: newUserId,
+            },
           },
-        });
-
-        if (transfer.canineId) {
-          await tx.canine.update({
-            where: { id: transfer.canineId },
-            data: { ownerId: newUserId },
-          });
-        } else if (transfer.litterId) {
-          await tx.litter.update({
-            where: { id: transfer.litterId },
-            data: { ownerId: newUserId },
-          });
-
-          await tx.canine.updateMany({
-            where: { litterId: transfer.litterId },
-            data: { ownerId: newUserId },
-          });
-        }
-
-        return {
-          success: true,
-          message: 'Ownership transferred successfully',
-          transferredTo: newUserId,
-        };
+        },
       });
+
+      const claimer = await this.prisma.user.findUnique({
+        where: { id: newUserId },
+        select: { email: true, fullName: true },
+      });
+
+      const itemName = transfer.canine?.name || transfer.litter?.name || 'Item';
+      const pcrId = transfer.canine?.pcrId || transfer.litter?.pcrId || 'N/A';
+
+      if (claimer?.email) {
+        await this.mailService.sendTransferClaimedEmail(
+          claimer.email,
+          claimer.fullName,
+          itemName,
+          pcrId,
+        );
+      }
+
+      return updatedTransfer;
     } catch (error: any) {
       this.logger.error(`Claim transfer failed: ${error.message}`);
-      if (
-        error instanceof NotFoundException ||
-        error instanceof BadRequestException
-      ) {
-        throw error;
-      }
-      throw new InternalServerErrorException(
-        'An error occurred during ownership transfer',
-      );
+      // ... error handling
+      throw error;
     }
   }
 
@@ -183,7 +224,6 @@ export class OwnershipTransferService {
       const history = await this.prisma.ownershipTransfer.findMany({
         where: {
           OR: [{ canineId: canineId }, { litterId: litterId }],
-          status: TransferOwnershipStatus.SUCCESSFUL,
         },
         include: {
           currentOwner: {

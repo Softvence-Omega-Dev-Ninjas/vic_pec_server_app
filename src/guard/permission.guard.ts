@@ -73,8 +73,15 @@ export class PermissionGuard implements CanActivate {
     );
 
     if (!hasAccess) {
+      const resourceDisplayName = check.resource
+        .toLowerCase()
+        .split('_')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      const actionName = check.action.replace('can', '');
+
       throw new ForbiddenException(
-        `Access denied: '${check.action}' permission required on '${check.resource}'`,
+        `Access denied: You do not have permission to ${actionName.toLowerCase()} ${resourceDisplayName}.`,
       );
     }
 

@@ -24,14 +24,18 @@ import {
   CreateTransferDto,
   TransferQueryDto,
 } from './dto/create-transfer.dto';
+import { RoleGuard } from 'src/guard/role.guard';
+import { Roles } from 'src/decorator/roles.decorator';
+import { RoleType } from 'generated/prisma/enums';
 
 @ApiTags('Ownership Transfer')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RoleGuard)
 @Controller('owner-transfer')
 export class OwnerTransferController {
   constructor(private readonly transferService: OwnershipTransferService) {}
 
+  @Roles(RoleType.OWNER)
   @Post('request')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -41,6 +45,7 @@ export class OwnerTransferController {
     return await this.transferService.createTransferRequest(req.userId, dto);
   }
 
+  @Roles(RoleType.OWNER)
   @Post('claim')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Claim ownership using a valid transfer code' })
@@ -48,6 +53,7 @@ export class OwnerTransferController {
     return await this.transferService.claimTransfer(req.userId, dto);
   }
 
+  @Roles(RoleType.OWNER)
   @Get('my-list')
   @ApiOperation({
     summary: 'Get list of sent and received transfers for the logged-in user',
