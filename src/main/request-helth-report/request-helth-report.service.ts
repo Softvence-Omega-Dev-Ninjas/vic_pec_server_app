@@ -1,8 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   Injectable,
   BadRequestException,
@@ -102,11 +97,11 @@ export class RequestHealthReportService {
       },
     });
   }
-
   async getAllRequests(userId: string) {
     return this.prisma.canineHealthRequest.findMany({
       where: {
-        OR: [{ requesterId: userId }, { ownerId: userId }],
+        // Sudhu amake (Owner) ke kora request gulo get hobe
+        ownerId: userId,
       },
       include: {
         requester: {
@@ -119,7 +114,13 @@ export class RequestHealthReportService {
         },
         owner: { select: { fullName: true, email: true, pcrId: true } },
         canine: {
-          select: { id: true, name: true, pcrId: true, images: { take: 1 } },
+          select: {
+            id: true,
+            name: true,
+            pcrId: true,
+            images: { take: 1 },
+            microchipId: true,
+          },
         },
         litter: { select: { id: true, name: true, pcrId: true } },
       },
