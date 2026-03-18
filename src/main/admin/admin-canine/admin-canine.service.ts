@@ -91,9 +91,10 @@ export class AdminCanineService {
     if (!currentCanine) {
       throw new NotFoundException('Canine record not found');
     }
-
+    console.log(dto);
     try {
       let updateData: any = { ...dto };
+      // console.log(updateData.gender);
 
       if (dto.tier && dto.tier !== currentCanine.tier) {
         const newPrefix = dto.tier === 'GOLD' ? 'G' : 'B';
@@ -141,6 +142,7 @@ export class AdminCanineService {
       throw new InternalServerErrorException('Update operation failed');
     }
   }
+
   async deleteCanine(id: string) {
     await this.getCanineById(id);
     try {

@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import {
   Injectable,
   NotFoundException,
   ConflictException,
   Logger,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 import { CreateReportDto } from './dto/report.dto';
@@ -24,25 +25,44 @@ export class ReportService {
 
   async createReport(userId: string | null, dto: CreateReportDto) {
     try {
-      if (userId) {
-        const existingReport = await this.prisma.report.findFirst({
-          where: {
-            reporterId: userId,
-            OR: [
-              { canineId: dto.canineId ? dto.canineId : undefined },
-              { litterId: dto.litterId ? dto.litterId : undefined },
-            ],
-            status: { in: [ReportStatus.UNREAD, ReportStatus.READ] },
-          },
-        });
-
-        if (existingReport) {
-          throw new ConflictException(
-            'You have already reported this item. Please wait for review.',
-          );
-        }
+      // 1. Auth Check: User must be logged in
+      if (!userId) {
+        throw new UnauthorizedException(
+          'You must be logged in to submit a report.',
+        );
       }
 
+      // 2. Fetch User Data
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { fullName: true, email: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found in the system.');
+      }
+
+      const reporterName = user.fullName || 'Unknown User';
+      const reporterEmail = user.email;
+
+      // 3. Strict Duplicate Check
+      // Using reporterId directly as we confirmed userId exists
+      const existingReport = await this.prisma.report.findFirst({
+        where: {
+          reporterId: userId,
+          canineId: dto.canineId || null,
+          litterId: dto.litterId || null,
+          status: { in: [ReportStatus.UNREAD, ReportStatus.READ] },
+        },
+      });
+
+      if (existingReport) {
+        throw new ConflictException(
+          'You have already reported this item. Please wait for review.',
+        );
+      }
+
+      // 4. Target existence check
       if (dto.canineId) {
         const canine = await this.prisma.canine.findUnique({
           where: { id: dto.canineId },
@@ -55,14 +75,23 @@ export class ReportService {
         if (!litter) throw new NotFoundException('Target litter not found');
       }
 
+      // 5. Generate Report ID: REP-[INCREMENT]-[RANDOM]
       const count = await this.prisma.report.count();
-      const reportId = `REP-${new Date().getFullYear()}-${(count + 1).toString().padStart(4, '0')}`;
+      const increment = (count + 1).toString().padStart(4, '0');
+      const randomStr = Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase();
+      const reportId = `REP-${increment}-${randomStr}`;
 
+      // 6. Final Creation
       return await this.prisma.report.create({
         data: {
           ...dto,
           reportId,
           reporterId: userId,
+          reporterName,
+          reporterEmail,
         },
       });
     } catch (error: any) {
@@ -180,5 +209,12 @@ export class ReportService {
       this.logger.error(`Error resolving report: ${error.message}`);
       throw error;
     }
+  }
+
+  async deleteReport(id: string) {
+    const report = await this.prisma.report.findUnique({ where: { id } });
+    if (!report) throw new NotFoundException('Report not found');
+
+    return await this.prisma.report.delete({ where: { id } });
   }
 }

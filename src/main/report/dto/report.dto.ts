@@ -5,7 +5,6 @@ import {
   IsEnum,
   IsOptional,
   IsUUID,
-  IsEmail,
 } from 'class-validator';
 import { PriorityLevel, ReportStatus } from 'generated/prisma/enums';
 
@@ -34,16 +33,6 @@ export class CreateReportDto {
   @IsOptional()
   @IsUUID()
   litterId?: string;
-
-  @ApiProperty({ example: 'John Doe' })
-  @IsString()
-  @IsNotEmpty()
-  reporterName!: string;
-
-  @ApiProperty({ example: 'john@example.com' })
-  @IsEmail()
-  @IsNotEmpty()
-  reporterEmail!: string;
 }
 
 export class UpdateReportStatusDto {

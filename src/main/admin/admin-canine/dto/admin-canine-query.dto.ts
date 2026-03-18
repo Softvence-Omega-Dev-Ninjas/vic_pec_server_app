@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // admin-canine/dto/admin-canine.dto.ts
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -89,6 +87,7 @@ export class UpdateCanineAdminDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsNumber()
+  @Type(() => Number) // এটি খুবই জরুরি
   weight?: number;
 
   @ApiPropertyOptional()
