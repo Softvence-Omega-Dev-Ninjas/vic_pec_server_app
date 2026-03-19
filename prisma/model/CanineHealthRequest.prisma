@@ -5,7 +5,6 @@ model CanineHealthRequest {
   requesterId     String
   requester       User                  @relation("SentHealthRequests", fields: [requesterId], references: [id])
 
-
   canineId    String? 
   canine      Canine?  @relation("CanineHealthRequests", fields: [canineId], references: [id])
 
