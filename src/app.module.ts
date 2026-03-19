@@ -28,6 +28,7 @@ import { PermissionService } from './main/admin/permission/permission.service';
 import { AdminCanineModule } from './main/admin/admin-canine/admin-canine.module';
 import { AdminLitterModule } from './main/admin/admin-litter/admin-litter.module';
 import { AdminOwnerTransferModule } from './main/admin/admin-owner-transfer/admin-owner-transfer.module';
+import { CertificateRequestModule } from './main/admin/certificate-request/certificate-request.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -56,6 +57,7 @@ import { AdminOwnerTransferModule } from './main/admin/admin-owner-transfer/admi
     AdminCanineModule,
     AdminLitterModule,
     AdminOwnerTransferModule,
+    CertificateRequestModule,
   ],
   controllers: [AppController],
   providers: [
