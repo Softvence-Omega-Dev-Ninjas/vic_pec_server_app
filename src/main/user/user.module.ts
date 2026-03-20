@@ -6,6 +6,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserProfileController } from './profile/user-profile.controller';
 import { UserProfileService } from './profile/user-profile.service';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Module({
   providers: [
@@ -14,6 +15,7 @@ import { UserProfileService } from './profile/user-profile.service';
     JwtStrategy,
     PrismaService,
     UserProfileService,
+    CloudinaryService,
   ],
   controllers: [UserController, UserProfileController],
 })

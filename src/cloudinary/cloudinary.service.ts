@@ -49,4 +49,27 @@ export class CloudinaryService {
 
     return Promise.all(uploadPromises);
   }
+
+  async uploadSingleImage(
+    file: Express.Multer.File,
+    folder: string = 'profiles',
+  ) {
+    return new Promise<{ url: string; public_id: string }>(
+      (resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder },
+          (error, result) => {
+            if (error)
+              return reject(
+                new InternalServerErrorException('Cloudinary Upload Failed'),
+              );
+            if (result) {
+              resolve({ url: result.secure_url, public_id: result.public_id });
+            }
+          },
+        );
+        streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      },
+    );
+  }
 }

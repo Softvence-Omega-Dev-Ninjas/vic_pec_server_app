@@ -29,6 +29,7 @@ import { AdminCanineModule } from './main/admin/admin-canine/admin-canine.module
 import { AdminLitterModule } from './main/admin/admin-litter/admin-litter.module';
 import { AdminOwnerTransferModule } from './main/admin/admin-owner-transfer/admin-owner-transfer.module';
 import { CertificateRequestModule } from './main/admin/certificate-request/certificate-request.module';
+import { NotificationsModule } from './notifications/notifications.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -58,6 +59,7 @@ import { CertificateRequestModule } from './main/admin/certificate-request/certi
     AdminLitterModule,
     AdminOwnerTransferModule,
     CertificateRequestModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

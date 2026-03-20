@@ -16,22 +16,65 @@ import {
   UpdateSettingsDto,
 } from './dto/user-profile.dto';
 import { UserService } from '../user.service';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 // import { MailService } from 'src/main/mail/mail.service';
 
 @Injectable()
 export class UserProfileService {
   private readonly logger = new Logger(UserService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
-  async updateProfile(userId: string, dto: UpdateProfileDto) {
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+    files?: {
+      profileImage?: Express.Multer.File[];
+      coverImage?: Express.Multer.File[];
+    },
+  ) {
     try {
       const user = await this.prisma.user.findUnique({ where: { id: userId } });
       if (!user) throw new NotFoundException('User not found');
 
+      const updateData: any = { ...dto };
+
+      // Handle Profile Image Upload
+      if (files?.profileImage?.[0]) {
+        const { url, public_id } =
+          await this.cloudinaryService.uploadSingleImage(
+            files.profileImage[0],
+            'avatars',
+          );
+        updateData.profileImage = {
+          upsert: {
+            create: { url, publicId: public_id },
+            update: { url, publicId: public_id },
+          },
+        };
+      }
+
+      // Handle Cover Image Upload
+      if (files?.coverImage?.[0]) {
+        const { url, public_id } =
+          await this.cloudinaryService.uploadSingleImage(
+            files.coverImage[0],
+            'covers',
+          );
+        updateData.coverImage = {
+          upsert: {
+            create: { url, publicId: public_id },
+            update: { url, publicId: public_id },
+          },
+        };
+      }
+
       return await this.prisma.user.update({
         where: { id: userId },
-        data: { ...dto },
+        data: updateData,
         select: {
           id: true,
           fullName: true,
@@ -41,6 +84,8 @@ export class UserProfileService {
           state: true,
           zipCode: true,
           country: true,
+          profileImage: { select: { url: true } },
+          coverImage: { select: { url: true } },
           updatedAt: true,
         },
       });
