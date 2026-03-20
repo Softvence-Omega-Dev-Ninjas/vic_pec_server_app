@@ -1,0 +1,25 @@
+model Notification {
+  id          String           @id @default(uuid())
+  
+  receiverId  String
+  receiver    User             @relation("UserNotifications", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  title       String
+  message     String           @db.Text
+  
+  link        String?          
+
+  category    ResourceType?    
+  
+  // Status
+  isRead      Boolean          @default(false)
+  
+  sourceId    String? 
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([receiverId])
+  @@index([isRead])
+  @@map("notifications")
+}

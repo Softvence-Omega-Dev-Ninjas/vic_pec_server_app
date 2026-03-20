@@ -235,6 +235,7 @@ export class UserService {
       include: {
         membership: true,
         profileImage: true,
+        coverImage: true,
         permissions: true,
       },
     });

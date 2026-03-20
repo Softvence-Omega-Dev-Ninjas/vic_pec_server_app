@@ -60,6 +60,8 @@ model User {
 
   sentHealthRequests     CanineHealthRequest[] @relation("SentHealthRequests")
   receivedHealthRequests CanineHealthRequest[] @relation("ReceivedHealthRequests")
+
+  notifications Notification[] @relation("UserNotifications")
   
 
   lastLogin             DateTime?           @default(now())
