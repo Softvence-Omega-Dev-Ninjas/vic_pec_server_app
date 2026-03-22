@@ -129,8 +129,12 @@ export class ReportService {
         skip,
         take: limit,
         include: {
-          canine: { select: { name: true, pcrId: true, ownerId: true } },
-          litter: { select: { name: true, pcrId: true, ownerId: true } },
+          canine: {
+            select: { name: true, pcrId: true, ownerId: true, images: true },
+          },
+          litter: {
+            select: { name: true, pcrId: true, ownerId: true, images: true },
+          },
           reporter: { select: { fullName: true, email: true, pcrId: true } },
         },
         orderBy: { createdAt: 'desc' },
