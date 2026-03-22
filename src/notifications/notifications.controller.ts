@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import {
@@ -31,7 +31,6 @@ import {
   MarkSelectedReadDto,
 } from './dto/notification.dto';
 import { RoleType } from 'generated/prisma/enums';
-
 @ApiTags('Admin / Notifications')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RoleGuard) // Sudhu Admin/SuperAdmin access secure kora holo
@@ -48,8 +47,8 @@ export class NotificationsController {
     // Service-e current logged-in admin er ID pathano hocche
     return this.notificationsService.findAll(
       query,
-      req.user.id,
-      req.user.roleType,
+      req.userId,
+      // req.user.roleType,
     );
   }
 
@@ -58,7 +57,7 @@ export class NotificationsController {
   @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Mark all unread notifications as read' })
   async markAllRead(@Req() req: any) {
-    return this.notificationsService.markAllAsRead(req.user.id);
+    return this.notificationsService.markAllAsRead(req.userId);
   }
 
   // 3. Selected kichu notification read mark kora
@@ -71,27 +70,27 @@ export class NotificationsController {
   }
 
   // 4. Single notification dekha (Automatic read mark hoy service-e)
-  @Get(':id')
+  @Get(':notificationId')
   @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get single notification details' })
   @ApiParam({ name: 'id', description: 'Notification UUID' })
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  async findOne(@Param('notificationId', ParseUUIDPipe) id: string) {
     return this.notificationsService.findOne(id);
   }
 
   // 5. Manual single read mark (optional, jodi findOne e na koren)
-  @Patch(':id/read')
+  @Patch(':notificationId/read')
   @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Mark a single notification as read' })
-  async markAsRead(@Param('id', ParseUUIDPipe) id: string) {
+  async markAsRead(@Param('notificationId', ParseUUIDPipe) id: string) {
     return this.notificationsService.markAsRead(id);
   }
 
   // 6. Specific notification delete kora
-  @Delete(':id')
+  @Delete(':notificationId')
   @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete a specific notification' })
-  async remove(@Param('id', ParseUUIDPipe) id: string) {
+  async remove(@Param('notificationId', ParseUUIDPipe) id: string) {
     return this.notificationsService.remove(id);
   }
 
@@ -100,6 +99,6 @@ export class NotificationsController {
   @Roles(RoleType.ADMIN, RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete all notifications for the current admin' })
   async clearAll(@Req() req: any) {
-    return this.notificationsService.removeAllForUser(req.user.id);
+    return this.notificationsService.removeAllForUser(req.req.userId);
   }
 }

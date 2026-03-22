@@ -13,15 +13,20 @@ import { CreateReportDto } from './dto/report.dto';
 import {
   PriorityLevel,
   ReportStatus,
+  ResourceType,
   UserStatus,
 } from 'generated/prisma/enums';
 import { ReportQueryDto } from './dto/report-query.dto';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class ReportService {
   private readonly logger = new Logger(ReportService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createReport(userId: string | null, dto: CreateReportDto) {
     try {
@@ -85,7 +90,7 @@ export class ReportService {
       const reportId = `REP-${increment}-${randomStr}`;
 
       // 6. Final Creation
-      return await this.prisma.report.create({
+      const report = await this.prisma.report.create({
         data: {
           ...dto,
           reportId,
@@ -94,6 +99,15 @@ export class ReportService {
           reporterEmail,
         },
       });
+
+      await this.notificationsService.alertAdmins({
+        title: `New Report: ${report.reportId}`,
+        message: `${reporterName} has submitted a new report regarding a ${dto.canineId ? 'canine' : 'litter'}.`,
+        category: ResourceType.REPORT,
+        link: `/admin/reports/${report.id}`,
+        sourceId: report.id,
+      });
+      return report;
     } catch (error: any) {
       this.logger.error(`Report submission failed: ${error.message}`);
       throw error;
