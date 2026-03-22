@@ -18,6 +18,8 @@ import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-otp.dto';
+import { ResourceType } from 'generated/prisma/enums';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class UserService {
@@ -25,6 +27,7 @@ export class UserService {
     private prisma: PrismaService,
     private mailService: MailService,
     private jwtService: JwtService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async register(dto: RegisterUserDto) {
@@ -63,6 +66,14 @@ export class UserService {
         otpAttempts: 0,
         roleType: 'OWNER',
       },
+    });
+
+    await this.notificationsService.alertAdmins({
+      title: 'New User Registered',
+      message: `${user.fullName} has joined the platform as an owner.`,
+      category: ResourceType.USER,
+      link: `/admin/users/${user.id}`, // Admin click korle details dekhte pabe
+      sourceId: user.id,
     });
 
     // Send OTP via Email

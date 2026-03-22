@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -15,7 +15,8 @@ import { PrismaService } from 'src/main/prisma/prisma.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { RegisterCanineDto, UpdateCanineDto } from './dto/create-canine.dto';
 import { CanineQueryDto } from './dto/canine-query.dto';
-import { RegistryTier } from 'generated/prisma/enums';
+import { RegistryTier, ResourceType } from 'generated/prisma/enums';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class CanineService {
@@ -24,6 +25,7 @@ export class CanineService {
   constructor(
     private prisma: PrismaService,
     private cloudinary: CloudinaryService,
+    private notificationsService: NotificationsService,
   ) {}
 
   // 1. Register Canine
@@ -67,7 +69,7 @@ export class CanineService {
       ]);
       const tier = pcrPrefix === 'G' ? RegistryTier.GOLD : RegistryTier.BLUE;
 
-      return await this.prisma.$transaction(async (tx) => {
+      const newCanine = await this.prisma.$transaction(async (tx) => {
         const existing = await tx.canine.findUnique({
           where: { microchipId: dto.microchipId },
         });
@@ -113,6 +115,16 @@ export class CanineService {
           },
         });
       });
+
+      await this.notificationsService.alertAdmins({
+        title: 'New Canine Registry',
+        message: `A new canine "${newCanine.name}" has been registered.`,
+        category: ResourceType.CANINE,
+        link: `/admin/canines/${newCanine.id}`,
+        sourceId: newCanine.id,
+      });
+
+      return newCanine;
     } catch (error: any) {
       this.logger.error(`Canine registration failed: ${error.message}`);
       if (

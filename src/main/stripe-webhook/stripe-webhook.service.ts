@@ -10,6 +10,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
+import { NotificationsService } from 'src/notifications/notifications.service';
+import { ResourceType } from 'generated/prisma/enums';
 
 @Injectable()
 export class StripeWebhookService {
@@ -19,6 +21,7 @@ export class StripeWebhookService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {
     this.stripe = new Stripe(this.configService.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2024-12-18.acacia' as any,
@@ -103,6 +106,13 @@ export class StripeWebhookService {
           currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         },
       });
+    });
+    await this.notificationsService.alertAdmins({
+      title: 'New Membership Subscription',
+      message: `User (ID: ${userId}) has successfully subscribed to a new plan.`,
+      category: ResourceType.MEMBERSHIP_PLAN, // ResourceType enum e add kora thakle
+      link: `/admin/subscriptions`,
+      sourceId: userId,
     });
 
     this.logger.log(

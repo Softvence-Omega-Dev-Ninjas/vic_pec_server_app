@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -12,13 +10,18 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 
-import { CanineStatus, TransferOwnershipStatus } from 'generated/prisma/enums';
+import {
+  CanineStatus,
+  ResourceType,
+  TransferOwnershipStatus,
+} from 'generated/prisma/enums';
 import {
   ClaimTransferDto,
   CreateTransferDto,
   TransferQueryDto,
 } from './dto/create-transfer.dto';
 import { MailService } from '../mail/mail.service';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class OwnershipTransferService {
@@ -27,6 +30,7 @@ export class OwnershipTransferService {
   constructor(
     private prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createTransferRequest(userId: string, dto: CreateTransferDto) {
@@ -125,6 +129,14 @@ export class OwnershipTransferService {
         );
       }
 
+      await this.notificationsService.alertAdmins({
+        title: 'New Ownership Transfer Request',
+        message: `A transfer request has been created for ${itemName} (${pcrId}) by ${ownerInfo?.fullName || 'Owner'}.`,
+        category: ResourceType.TRANSFER_OWNERSHIP,
+        link: `/admin/transfers`, // Admin panel dashboard link
+        sourceId: transfer.id,
+      });
+
       return transfer;
     } catch (error: any) {
       this.logger.error(`Transfer request failed: ${error.message}`);
@@ -206,6 +218,14 @@ export class OwnershipTransferService {
           pcrId,
         );
       }
+
+      await this.notificationsService.alertAdmins({
+        title: 'Ownership Transfer Claimed',
+        message: `${claimer?.fullName || 'A user'} has claimed the transfer for ${itemName} (${pcrId}). Pending admin approval.`,
+        category: ResourceType.TRANSFER_OWNERSHIP,
+        link: `/admin/transfers/${transfer.id}`,
+        sourceId: transfer.id,
+      });
 
       return updatedTransfer;
     } catch (error: any) {

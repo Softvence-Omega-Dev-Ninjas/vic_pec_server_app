@@ -15,7 +15,8 @@ import { PrismaService } from 'src/main/prisma/prisma.service';
 import { CreateLitterDto, UpdateLitterDto } from './dto/create-litter.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { LitterQueryDto } from './dto/LitterQueryDto';
-import { RegistryTier } from 'generated/prisma/enums';
+import { RegistryTier, ResourceType } from 'generated/prisma/enums';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class LitterService {
@@ -24,6 +25,7 @@ export class LitterService {
   constructor(
     private prisma: PrismaService,
     private cloudinary: CloudinaryService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async createLitter(
@@ -122,7 +124,7 @@ export class LitterService {
         this.cloudinary.uploadImages(docs),
       ]);
 
-      return await this.prisma.$transaction(async (tx) => {
+      const newLitter = await this.prisma.$transaction(async (tx) => {
         if (dto.microchipId) {
           const existing = await tx.litter.findUnique({
             where: { microchipId: dto.microchipId },
@@ -165,6 +167,14 @@ export class LitterService {
             father: true,
           },
         });
+      });
+
+      await this.notificationsService.alertAdmins({
+        title: 'Litter Registration',
+        message: `A new litter has been registered in the system.`,
+        category: ResourceType.CANINE,
+        link: `/admin/litters/${newLitter.id}`,
+        sourceId: newLitter.id,
       });
     } catch (error: any) {
       this.logger.error(`Litter creation failed: ${error.message}`);

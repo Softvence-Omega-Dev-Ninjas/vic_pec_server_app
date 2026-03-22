@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import {
@@ -80,17 +79,19 @@ export class NotificationsService {
   }
 
   // 2. Get All Notifications (Strictly filtered for logged-in Admin/Super Admin)
-  async findAll(
-    query: QueryNotificationDto,
-    currentUserId: string,
-    currentUserRole: RoleType,
-  ) {
+  async findAll(query: QueryNotificationDto, currentUserId: string) {
     try {
-      // Only Admin or Super Admin can access this list
-      if (
-        currentUserRole !== RoleType.ADMIN &&
-        currentUserRole !== RoleType.SUPER_ADMIN
-      ) {
+      // Role validation (Security Check)
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: currentUserId },
+        select: { roleType: true },
+      });
+      if (!user) {
+        throw new BadRequestException('You have to loged in!');
+      }
+      const allowedRoles: RoleType[] = [RoleType.ADMIN, RoleType.SUPER_ADMIN];
+      if (!allowedRoles.includes(user.roleType)) {
         throw new BadRequestException(
           'Access denied. Only admins can view these notifications.',
         );
@@ -99,11 +100,17 @@ export class NotificationsService {
       const { page = 1, limit = 10, searchTerm, isRead } = query;
       const skip = (Number(page) - 1) * Number(limit);
 
+      // Building the dynamic filter
       const where: any = {
-        receiverId: currentUserId, // Protiti admin tar nijer list dekhbe
+        receiverId: currentUserId, // Prityti Admin shudhu tar notification dekhbe
       };
 
-      if (isRead !== undefined) where.isRead = isRead;
+      // boolean filter fix: strictly check for undefined
+      if (isRead === 'true') {
+        where.isRead = true;
+      } else if (isRead === 'false') {
+        where.isRead = false;
+      }
 
       if (searchTerm) {
         where.OR = [
@@ -112,7 +119,8 @@ export class NotificationsService {
         ];
       }
 
-      const [data, total] = await Promise.all([
+      // Parallel execution for speed
+      const [data, total] = await this.prisma.$transaction([
         this.prisma.notification.findMany({
           where,
           skip,
@@ -122,8 +130,8 @@ export class NotificationsService {
             receiver: {
               select: {
                 id: true,
-                email: true,
                 fullName: true,
+                email: true,
               },
             },
           },
@@ -141,9 +149,9 @@ export class NotificationsService {
         data,
       };
     } catch (error) {
-      console.error(error);
+      console.error('FindAll Notifications Error:', error);
       if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException('Notification gulo pawa jayni');
+      throw new InternalServerErrorException('Notification fetching failed');
     }
   }
 

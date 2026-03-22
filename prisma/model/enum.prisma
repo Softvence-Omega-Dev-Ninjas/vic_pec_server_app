@@ -33,7 +33,7 @@ enum RegistrationRequestType {
 
 enum VerificationType {
   GOLD
-  SILVER
+  BLUE
   NONE
 }
 

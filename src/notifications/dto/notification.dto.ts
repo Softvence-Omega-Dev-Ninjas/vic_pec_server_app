@@ -3,7 +3,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  IsBoolean,
+  // IsBoolean,
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -51,9 +51,8 @@ export class QueryNotificationDto {
   receiverId?: string;
 
   @IsOptional()
-  @IsBoolean()
-  @Type(() => Boolean)
-  isRead?: boolean;
+  @IsString() // String hishebe nibo (true/false)
+  isRead?: string;
 }
 
 export class MarkSelectedReadDto {
