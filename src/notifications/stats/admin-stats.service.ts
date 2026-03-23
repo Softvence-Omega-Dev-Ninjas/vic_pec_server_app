@@ -1,10 +1,13 @@
-// admin-stats.service.ts
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable } from '@nestjs/common';
+import { SubscriptionStatus } from 'generated/prisma/enums';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 
 @Injectable()
 export class AdminStatsService {
   constructor(private prisma: PrismaService) {}
+
   async getDashboardStats() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -20,7 +23,7 @@ export class AdminStatsService {
       totalUsers,
       activeUsers,
       pendingUsers,
-      unverifiedUsers, // Email verify koreni emon user
+      unverifiedUsers,
       totalDogs,
       goldDogs,
       blueDogs,
@@ -34,38 +37,38 @@ export class AdminStatsService {
       unreadReports,
       pendingCerts,
       pendingTransfers,
-      //   activeSubs,
+      activeSubs,
       ...chartQueries
     ] = await Promise.all([
-      // --- USER STATS ---
       this.prisma.user.count(),
       this.prisma.user.count({ where: { status: 'ACTIVE' } }),
       this.prisma.user.count({ where: { status: 'PENDING' } }),
       this.prisma.user.count({ where: { isVerified: false } }),
 
-      // --- CANINE STATS ---
       this.prisma.canine.count(),
       this.prisma.canine.count({ where: { tier: 'GOLD' } }),
-      this.prisma.canine.count({ where: { tier: 'BLUE' } }), // NONE = Blue
+      this.prisma.canine.count({ where: { tier: 'BLUE' } }),
       this.prisma.canine.count({ where: { status: 'PENDING' } }),
       this.prisma.canine.count({
         where: { status: 'APPROVED', updatedAt: { gte: today } },
       }),
 
-      // --- LITTER STATS ---
       this.prisma.litter.count(),
       this.prisma.litter.count({ where: { tier: 'GOLD' } }),
-      this.prisma.litter.count({ where: { tier: 'BLUE' } }), // NONE = Blue
+      this.prisma.litter.count({ where: { tier: 'BLUE' } }),
       this.prisma.litter.count({ where: { status: 'PENDING' } }),
 
-      // --- OTHERS ---
       this.prisma.report.count(),
       this.prisma.report.count({ where: { status: 'UNREAD' } }),
       this.prisma.certificateRequest.count({ where: { status: 'PENDING' } }),
       this.prisma.ownershipTransfer.count({ where: { status: 'PENDING' } }),
-      this.prisma.subscription.count({ where: { status: 'active' } }),
+      this.prisma.subscription.count({
+        where: {
+          status: SubscriptionStatus.PAID,
+          currentPeriodEnd: { gte: new Date() },
+        },
+      }),
 
-      // --- CHART DATA ---
       ...last7Days.map((date) =>
         this.prisma.user.count({
           where: {
@@ -112,6 +115,7 @@ export class AdminStatsService {
       requests: {
         certificates: pendingCerts,
         transfers: pendingTransfers,
+        activeSubscriptions: activeSubs,
         totalPendingActions:
           pendingCanines + pendingLitters + pendingCerts + pendingTransfers,
       },

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -13,6 +14,7 @@ import {
   CreateMembershipDto,
   UpdateMembershipDto,
 } from './dto/create-membership-plan.dto';
+import { SubscriptionStatus } from 'generated/prisma/enums';
 
 @Injectable()
 export class MembershipPlanService {
@@ -91,26 +93,54 @@ export class MembershipPlanService {
 
   async deletePlan(id: string) {
     try {
+      const now = new Date();
+
+      // 1. Check for active/valid subscriptions
       const plan = await this.prisma.membership.findUnique({
         where: { id },
-        include: { _count: { select: { users: true } } },
+        include: {
+          _count: {
+            select: {
+              subscriptions: {
+                where: {
+                  status: SubscriptionStatus.PAID,
+                  currentPeriodEnd: {
+                    gt: now, // Check if the subscription period is still ongoing
+                  },
+                },
+              },
+            },
+          },
+        },
       });
 
       if (!plan) throw new NotFoundException('Plan not found');
 
-      if (plan._count.users > 0) {
-        throw new BadRequestException('Cannot delete plan with active users');
+      // 2. Logic: If count > 0, it means someone is still using the plan within their paid period
+      if (plan._count.subscriptions > 0) {
+        throw new BadRequestException(
+          'Cannot delete plan. There are users with active subscriptions that haven’t expired yet.',
+        );
       }
 
+      // 3. Delete the plan if no active periods are found
       await this.prisma.membership.delete({ where: { id } });
-      return { success: true, message: 'Plan deleted successfully' };
+
+      return {
+        success: true,
+        message: 'Membership plan deleted successfully',
+      };
     } catch (error: any) {
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException
-      )
+      ) {
         throw error;
-      throw new InternalServerErrorException('Failed to delete plan');
+      }
+      this.logger.error(`Delete Failed: ${error.message}`);
+      throw new InternalServerErrorException(
+        'Failed to delete membership plan',
+      );
     }
   }
 }

@@ -9,6 +9,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
@@ -190,6 +191,7 @@ export class UserService {
         fullName: user.fullName,
         pcrId: user.pcrId,
         roleType: user.roleType,
+        membershipId: user.membershipId,
       },
     });
   }
@@ -321,5 +323,47 @@ export class UserService {
       message:
         'Password reset successful. You can now login with your new password.',
     };
+  }
+
+  async getUserById(userId: string) {
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          profileImage: true,
+          coverImage: true,
+          membership: {
+            select: { name: true, tier: true },
+          },
+          _count: {
+            select: { canines: { where: { status: 'APPROVED' } } },
+          },
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User profile not found');
+      }
+
+      // Security: Sensitive fields remove kora hoyeche
+      const {
+        password,
+        otp,
+        otpExpires,
+        otpAttempts,
+        otpLockUntil,
+        pcrIncremental,
+        pcrRandom,
+        ...publicUser
+      } = user;
+
+      return {
+        success: true,
+        data: publicUser,
+      };
+    } catch (error: any) {
+      if (error instanceof NotFoundException) throw error;
+      throw new InternalServerErrorException('Error retrieving user profile');
+    }
   }
 }

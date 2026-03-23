@@ -1,10 +1,21 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
 import { PaymentService } from './payment.service';
 import { CreateCheckoutDto } from '../admin/membership-plan/dto/create-checkout.dto';
+import { Roles } from 'src/decorator/roles.decorator';
+import { RoleType } from 'generated/prisma/enums';
+import { PaginationDto, RevenueFilterDto } from './dto/PaginationDto';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -19,5 +30,19 @@ export class PaymentController {
       req.userId,
       dto.membershipId,
     );
+  }
+
+  @Get('/admin/all')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get all subscription payments (Pagination)' })
+  async findAll(@Query() dto: PaginationDto) {
+    return await this.paymentService.getAllPayments(dto);
+  }
+
+  @Get('/admin/revenue-stats')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get day-wise revenue stats for a specific month' })
+  async getStats(@Query() dto: RevenueFilterDto) {
+    return await this.paymentService.getRevenueStats(dto);
   }
 }

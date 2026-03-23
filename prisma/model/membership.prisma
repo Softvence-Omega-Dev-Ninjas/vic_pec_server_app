@@ -1,0 +1,32 @@
+
+model Membership {
+  id            String         @id @default(uuid())
+  tier          String         @unique 
+  name          String
+  currentPrice  Float          @default(0)
+  features      Json?
+  canineLimit   Int            @default(1)
+  
+  users         User[]
+  subscriptions Subscription[]
+  @@map("memberships")
+}
+
+model Subscription {
+  id                   String     @id @default(uuid())
+  stripeSubscriptionId String     @unique
+  userId               String
+  user                 User       @relation(fields: [userId], references: [id])
+  membershipId         String
+  membership           Membership @relation(fields: [membershipId], references: [id])
+
+  amountPaid           Float   
+  currency             String     @default("USD")
+  status               String     // active, canceled, past_due
+  
+  currentPeriodStart   DateTime   @default(now())
+  currentPeriodEnd     DateTime
+  
+  createdAt            DateTime   @default(now())
+  @@map("subscriptions")
+}

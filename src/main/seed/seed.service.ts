@@ -42,7 +42,7 @@ export class SeedService implements OnModuleInit {
         currentPrice: 0,
         canineLimit: 1,
         features: [
-          'One (1) Canine Registration',
+          // 'One (1) Canine Registration',
           'Standard Pricing on PCR Registration Certificates & Pedigrees',
           'Standard Litter Registration & Canine Transfer Fees',
         ],
@@ -53,7 +53,7 @@ export class SeedService implements OnModuleInit {
         currentPrice: 80,
         canineLimit: 3,
         features: [
-          'Three (3) Canine Registrations',
+          // 'Three (3) Canine Registrations',
           'Discounted PCR Registration Certificates & Pedigrees',
           'Discounted Litter Registrations & Canine Transfer Fees',
           'Free Digital Downloads of Certificates & Pedigrees',
@@ -65,7 +65,7 @@ export class SeedService implements OnModuleInit {
         currentPrice: 150,
         canineLimit: 7,
         features: [
-          'Seven (7) Canine Registrations',
+          // 'Seven (7) Canine Registrations',
           'Complimentary Registration Certificate & Canine Pedigree',
           'Free Litter Registrations & Canine Transfers',
           "Access to PCR's Private PA Communication Group",
