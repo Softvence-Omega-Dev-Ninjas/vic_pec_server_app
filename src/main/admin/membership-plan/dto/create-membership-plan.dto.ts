@@ -48,26 +48,30 @@ export class CreateMembershipDto {
 }
 
 export class UpdateMembershipDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 'Updated Plan Name',
+    description: 'Change the display name of the plan',
+  })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 199.99,
+    description: 'Update the annual price',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   currentPrice?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Update the max canine registration limit',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   canineLimit?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  features?: string[];
 }

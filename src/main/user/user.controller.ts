@@ -11,6 +11,7 @@ import {
   UseGuards,
   Req,
   UnauthorizedException,
+  Param,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -118,5 +119,10 @@ export class UserController {
   @ApiOperation({ summary: 'Reset password using OTP' })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.userService.resetPassword(dto);
+  }
+
+  @Get('profile/:userId')
+  async getPublicProfile(@Param('userId') id: string) {
+    return this.userService.getUserById(id);
   }
 }

@@ -196,7 +196,9 @@ export class CanineService {
           orderBy: { [sortBy || 'createdAt']: sortOrder || 'desc' },
           include: {
             breedRelation: { select: { name: true, breedCode: true } },
-            owner: { select: { fullName: true, email: true, pcrId: true } },
+            owner: {
+              select: { id: true, fullName: true, email: true, pcrId: true },
+            },
             images: { take: 1 },
           },
         }),
@@ -492,6 +494,99 @@ export class CanineService {
     } catch (error: any) {
       this.logger.error(`Error fetching owner stats: ${error.message}`);
       throw new InternalServerErrorException('Could not retrieve statistics');
+    }
+  }
+
+  async getCaninesByOwnerId(targetOwnerId: string, query: CanineQueryDto) {
+    try {
+      // 1. Validation: Check if the owner actually exists
+      const ownerExists = await this.prisma.user.findUnique({
+        where: { id: targetOwnerId },
+        select: { id: true, fullName: true },
+      });
+
+      if (!ownerExists) {
+        throw new NotFoundException(`Owner with ID ${targetOwnerId} not found`);
+      }
+
+      const {
+        page = 1,
+        limit = 10,
+        search,
+        sortBy = 'createdAt',
+        sortOrder = 'desc',
+        breedId,
+        gender,
+        tier,
+        color,
+        status = 'APPROVED',
+      } = query;
+
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        AND: [
+          { ownerId: targetOwnerId },
+          { status }, // Validated status
+          search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: 'insensitive' } },
+                  { pcrId: { contains: search, mode: 'insensitive' } },
+                  { microchipId: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+          breedId ? { breedId } : {},
+          gender ? { gender } : {},
+          tier ? { tier } : {},
+          color ? { color: { contains: color, mode: 'insensitive' } } : {},
+        ],
+      };
+
+      const [data, total] = await Promise.all([
+        this.prisma.canine.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            breedRelation: { select: { name: true, breedCode: true } },
+            owner: {
+              select: {
+                id: true,
+                fullName: true,
+                pcrId: true,
+                profileImage: true,
+              },
+            },
+            images: { take: 1 },
+          },
+        }),
+        this.prisma.canine.count({ where }),
+      ]);
+
+      return {
+        success: true,
+        data,
+        ownerInfo: ownerExists,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to fetch canines for owner ${targetOwnerId}: ${error.message}`,
+      );
+
+      if (error instanceof NotFoundException) throw error;
+
+      throw new InternalServerErrorException(
+        error.message || 'Could not retrieve canines for the specified owner',
+      );
     }
   }
 }

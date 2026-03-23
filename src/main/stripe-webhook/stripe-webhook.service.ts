@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -11,7 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
 import { NotificationsService } from 'src/notifications/notifications.service';
-import { ResourceType } from 'generated/prisma/enums';
+import { SubscriptionStatus } from 'generated/prisma/enums';
 
 @Injectable()
 export class StripeWebhookService {
@@ -53,8 +54,16 @@ export class StripeWebhookService {
           break;
 
         case 'customer.subscription.deleted':
-          await this.handleSubscriptionDeleted(
-            event.data.object as Stripe.Subscription,
+          await this.handleSubscriptionStatusUpdate(
+            (event.data.object as Stripe.Subscription).id,
+            SubscriptionStatus.CANCELED,
+          );
+          break;
+
+        case 'invoice.payment_failed':
+          await this.handleSubscriptionStatusUpdate(
+            (event.data.object as any).subscription as string,
+            SubscriptionStatus.UNPAID,
           );
           break;
 
@@ -74,60 +83,74 @@ export class StripeWebhookService {
     const membershipId = session.metadata?.membershipId;
     const stripeSubId = session.subscription as string;
 
-    if (!userId || !membershipId) {
-      this.logger.error('Missing userId or membershipId in session metadata');
-      return;
-    }
+    if (!userId || !membershipId || !stripeSubId) return;
+
+    const subscription: any =
+      await this.stripe.subscriptions.retrieve(stripeSubId);
+    const periodEnd = new Date(subscription.current_period_end * 1000);
 
     await this.prisma.$transaction(async (tx) => {
       const plan = await tx.membership.findUnique({
         where: { id: membershipId },
       });
-      if (!plan)
-        throw new Error('Membership plan not found during webhook processing');
+      if (!plan) throw new Error('Plan not found');
+
+      const user = await tx.user.findUnique({ where: { id: userId } });
+
+      // Update User and PCR ID logic
+      let updateData: any = { membershipId: membershipId };
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // logic: If plan is PRESTIGE, change prefix to PA and regenerate pcrId
+      if (plan.tier === 'PRESTIGE' && user.pcrPrefix !== 'PA') {
+        const newPrefix = 'PA';
+        const newPcrId = `PCR-${newPrefix}${user.pcrIncremental}-${user.pcrRandom}`;
+        updateData.pcrPrefix = newPrefix;
+        updateData.pcrId = newPcrId;
+      }
 
       await tx.user.update({
         where: { id: userId },
-        data: { membershipId: membershipId },
+        data: updateData,
       });
 
+      // Upsert subscription
       await tx.subscription.upsert({
         where: { stripeSubscriptionId: stripeSubId },
         update: {
-          status: 'active',
-          currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          status: SubscriptionStatus.PAID,
+          currentPeriodEnd: periodEnd,
         },
         create: {
           stripeSubscriptionId: stripeSubId,
           userId: userId,
           membershipId: membershipId,
           amountPaid: plan.currentPrice,
-          status: 'active',
-          currentPeriodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+          status: SubscriptionStatus.PAID,
+          currentPeriodEnd: periodEnd,
         },
       });
     });
-    await this.notificationsService.alertAdmins({
-      title: 'New Membership Subscription',
-      message: `User (ID: ${userId}) has successfully subscribed to a new plan.`,
-      category: ResourceType.MEMBERSHIP_PLAN, // ResourceType enum e add kora thakle
-      link: `/admin/subscriptions`,
-      sourceId: userId,
-    });
 
     this.logger.log(
-      `Membership & Subscription activated for User ID: ${userId}`,
+      `Subscription activated and PCR Prefix updated for User: ${userId}`,
     );
   }
 
-  private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-    const subId = subscription.id;
+  private async handleSubscriptionStatusUpdate(
+    subId: string,
+    status: SubscriptionStatus,
+  ) {
+    if (!subId) return;
 
     await this.prisma.subscription.updateMany({
       where: { stripeSubscriptionId: subId },
-      data: { status: 'canceled' },
+      data: { status: status },
     });
 
-    this.logger.log(`Subscription ${subId} marked as canceled`);
+    this.logger.log(`Subscription ${subId} status updated to ${status}`);
   }
 }

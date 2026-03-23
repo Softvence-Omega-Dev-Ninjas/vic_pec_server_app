@@ -66,6 +66,14 @@ export class CanineController {
     return await this.canineService.findAll(query);
   }
 
+  @Get('owner/:ownerId')
+  async getByOwner(
+    @Param('ownerId') ownerId: string,
+    @Query() query: CanineQueryDto,
+  ) {
+    return this.canineService.getCaninesByOwnerId(ownerId, query);
+  }
+
   @Get(':canineId')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get canine details by ID' })
