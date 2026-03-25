@@ -197,7 +197,13 @@ export class CanineService {
           include: {
             breedRelation: { select: { name: true, breedCode: true } },
             owner: {
-              select: { id: true, fullName: true, email: true, pcrId: true },
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                pcrId: true,
+                profileImage: true,
+              },
             },
             images: { take: 1 },
           },
