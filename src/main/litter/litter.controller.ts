@@ -105,7 +105,7 @@ export class LitterController {
     return await this.litterService.remove(litterId, req.userId, req.user.role);
   }
 
-  @Get('my-litters')
+  @Get('my-litters/own')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get litters owned by the current user' })
   async getMyLitters(@Req() req: any, @Query() query: LitterQueryDto) {
