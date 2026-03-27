@@ -44,6 +44,7 @@ enum CanineStatus {
   APPROVED
   DECLINE
   UNDER_REVIEW
+  PENDING_PAYMENT
 }
 
 enum CertificateRequestStatus {
@@ -87,6 +88,7 @@ enum ResourceType {
   CERTIFICATE
   REPORT
   TRANSFER_OWNERSHIP
+  MEMBERSHIP_PLAN
 }
 
 

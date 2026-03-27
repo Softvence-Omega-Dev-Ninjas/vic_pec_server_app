@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "CanineStatus" ADD VALUE 'PENDING_PAYMENT';

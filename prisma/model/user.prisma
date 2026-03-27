@@ -39,7 +39,7 @@ model User {
   sentTransfers         OwnershipTransfer[] @relation("SentTransfers")
   receivedTransfers     OwnershipTransfer[] @relation("ReceivedTransfers")
   transferRequests   TransferRequest[]
-
+  transactions     Transaction[]
   // Membership & Role
   membershipId          String?
   membership            Membership?          @relation(fields: [membershipId], references: [id])

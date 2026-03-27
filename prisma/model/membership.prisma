@@ -7,11 +7,37 @@ model Membership {
   features      Json?
   canineLimit   Int            @default(1)
   
+  canineRegDiscount    Float @default(0) 
+  litterRegDiscount    Float @default(0)
+  transferDiscount     Float @default(0)
+  certificateDiscount  Float @default(0)
+
+  servicePricings     ServicePricing[]
   users         User[]
   subscriptions Subscription[]
   @@map("memberships")
 }
 
+
+enum ServiceType {
+  CANINE_REG
+  LITTER_REG
+  TRANSFER
+  CERTIFICATE
+}
+
+
+model ServicePricing {
+  id            String      @id @default(uuid())
+  serviceType   ServiceType  // Enum: CANINE_REG, LITTER_REG, TRANSFER, CERTIFICATE
+  price         Float       @default(0) // Admin set korbe (e.g., $25)
+
+  membershipId  String
+  membership    Membership  @relation(fields: [membershipId], references: [id])
+  updatedAt     DateTime    @updatedAt
+  @@map("service_pricings")
+  @@unique([serviceType, membershipId])
+}
 model Subscription {
   id                   String     @id @default(uuid())
   stripeSubscriptionId String     @unique
@@ -30,3 +56,35 @@ model Subscription {
   createdAt            DateTime   @default(now())
   @@map("subscriptions")
 }
+
+
+enum SubscriptionStatus {
+  PAID
+  UNPAID
+  CANCELED
+}
+
+
+
+model Transaction {
+  id               String           @id @default(uuid())
+  stripeSessionId  String           @unique
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+  
+  // Ki dhoroner payment sheta track korar jonno
+  serviceType      ServiceType
+  
+  // Amount details
+  amount           Float
+  currency         String           @default("USD")
+  status           SubscriptionStatus    @default(PAID) // PENDING, COMPLETED, FAILED
+
+  // Optional: Oi specific resource er ID (Mane kon canine ba kon litter er jonno pay kora hoyeche)
+  resourceId       String?          // e.g., canineId ba litterId
+
+  createdAt        DateTime         @default(now())
+
+  @@map("transactions")
+}
+

@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { PaymentService } from '../payment/payment.service';
 
 @Module({
   providers: [
@@ -13,6 +14,7 @@ import { NotificationsGateway } from 'src/notifications/notifications.gateway';
     CloudinaryService,
     NotificationsService,
     NotificationsGateway,
+    PaymentService,
   ],
   controllers: [CanineController],
 })
