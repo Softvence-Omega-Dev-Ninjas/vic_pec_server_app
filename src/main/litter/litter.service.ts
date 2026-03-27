@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
@@ -10,13 +11,14 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 // import { CloudinaryService } from 'src/common/cloudinary/cloudinary.service';
 import { CreateLitterDto, UpdateLitterDto } from './dto/create-litter.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { LitterQueryDto } from './dto/LitterQueryDto';
-import { RegistryTier, ResourceType } from 'generated/prisma/enums';
+// import { RegistryTier, ResourceType } from 'generated/prisma/enums';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { PaymentService } from '../payment/payment.service';
 
@@ -31,6 +33,48 @@ export class LitterService {
     private readonly paymentService: PaymentService,
   ) {}
 
+  private async calculateGeneration(
+    motherId?: string,
+    fatherId?: string,
+  ): Promise<string> {
+    // Jodi kono ekjon parent na thake, default F1 (Individual registration logic er moto)
+    // if (!motherId || !fatherId) return 'F1';
+
+    const [mother, father] = await Promise.all([
+      this.prisma.canine.findUnique({ where: { pcrId: motherId } }),
+      this.prisma.canine.findUnique({ where: { pcrId: fatherId } }),
+    ]);
+
+    if (!mother)
+      throw new BadRequestException(
+        `Mother PCR ID ${motherId} not found in our registry.`,
+      );
+    if (!father)
+      throw new BadRequestException(
+        `Father PCR ID ${fatherId} not found in our registry.`,
+      );
+
+    // 1. Both Pure Breed (Generation is null) => Result: F1
+    if (!mother?.generation && !father?.generation) {
+      return 'F1';
+    }
+
+    // 2. One is F1 and other is Pure Breed => Result: F1B
+    if (
+      (mother?.generation === 'F1' && !father?.generation) ||
+      (!mother?.generation && father?.generation === 'F1')
+    ) {
+      return 'F1B';
+    }
+
+    // 3. Both are F1 => Result: F2
+    if (mother?.generation === 'F1' && father?.generation === 'F1') {
+      return 'F2';
+    }
+
+    // 4. Default fallback for higher generations
+    return 'F1';
+  }
   async createLitter(
     userId: string,
     dto: CreateLitterDto,
@@ -38,48 +82,18 @@ export class LitterService {
     docs: Express.Multer.File[],
   ) {
     try {
-      // 1. Breed Fetch and Basic Validation
       const breed = await this.prisma.breed.findUnique({
         where: { id: dto.breedId },
       });
-      if (!breed) throw new NotFoundException('Selected breed not found');
+      if (!breed) throw new NotFoundException('Breed not found');
 
-      // 2. Parent and Generation Validation
-      if (dto.motherPcrId || dto.fatherPcrId) {
-        const parentPcrIds = [dto.motherPcrId, dto.fatherPcrId].filter(
-          Boolean,
-        ) as string[];
+      // 1. Calculate Generation Automatically
+      const calculatedGen = await this.calculateGeneration(
+        dto.motherPcrId,
+        dto.fatherPcrId,
+      );
 
-        const parents = await this.prisma.canine.findMany({
-          where: { pcrId: { in: parentPcrIds } },
-          select: { pcrId: true, gender: true, generation: true },
-        });
-
-        parents.forEach((parent) => {
-          if (parent.pcrId === dto.motherPcrId && parent.gender !== 'FEMALE') {
-            throw new BadRequestException(
-              `Canine ${parent.pcrId} is not a Female and cannot be a mother`,
-            );
-          }
-          if (parent.pcrId === dto.fatherPcrId && parent.gender !== 'MALE') {
-            throw new BadRequestException(
-              `Canine ${parent.pcrId} is not a Male and cannot be a father`,
-            );
-          }
-        });
-
-        // Designer breed F1 ancestor check
-        if (breed.type === 'DESIGNER' && dto.generation !== 'F1') {
-          const hasF1Ancestor = parents.some((p) => p.generation === 'F1');
-          if (!hasF1Ancestor) {
-            throw new BadRequestException(
-              'Registration rejected: Later generations must trace back to a registered F1 ancestor',
-            );
-          }
-        }
-      }
-
-      // 3. User Membership and Pricing Logic
+      // 2. Pricing & Membership Check
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
         include: {
@@ -91,28 +105,30 @@ export class LitterService {
         },
       });
 
-      if (!user || !user.membership)
+      if (!user?.membership)
         throw new BadRequestException('Active membership required');
 
-      const servicePricing = user.membership.servicePricings[0];
-      const basePrice = servicePricing?.price || 0;
-      const discount = user.membership.litterRegDiscount || 0;
-      const finalAmount = Math.round(basePrice * (1 - discount) * 100);
+      const pricing = user.membership.servicePricings[0];
+      const finalAmount = Math.round(
+        (pricing?.price || 0) *
+          (1 - (user.membership.litterRegDiscount || 0)) *
+          100,
+      );
 
-      // 4. Image/Doc Upload (Transaction er agei upload kora bhalo)
+      // 3. Upload Media
       const [imageUrlList, docUrlList] = await Promise.all([
         this.cloudinary.uploadImages(images),
         this.cloudinary.uploadImages(docs),
       ]);
 
-      // 5. Execution Logic: Free vs Paid
+      // 4. Execution: Free vs Paid
       if (finalAmount <= 0) {
-        // FREE REGISTRATION: Direct Database Creation
         return await this.prisma.$transaction(async (tx) => {
           return await this.executeLitterCreation(
             tx,
             userId,
             dto,
+            calculatedGen,
             imageUrlList,
             docUrlList,
             breed,
@@ -120,101 +136,128 @@ export class LitterService {
         });
       }
 
-      // PAID REGISTRATION: Stripe Checkout Session
       return await this.paymentService.createLitterSession(
         userId,
         dto,
+        calculatedGen,
         imageUrlList,
         docUrlList,
       );
     } catch (error: any) {
       this.logger.error(`Litter creation failed: ${error.message}`);
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-      throw new InternalServerErrorException(
-        error.message || 'Error occurred while creating litter',
-      );
+      throw error;
     }
   }
 
   async executeLitterCreation(
     tx: any,
     userId: string,
-    dto: CreateLitterDto,
-    imageUrlList: any[],
-    docUrlList: any[],
+    dto: any,
+    gen: string,
+    imageUrls: string[],
+    docUrls: string[],
     breed: any,
   ) {
+    const pcrPrefix = 'L';
     const pcrBreedCode = breed.breedCode;
 
-    // PCR ID Generation
+    // Incremental logic
     const lastLitter = await tx.litter.findFirst({
-      where: { pcrBreedCode, generation: dto.generation },
+      where: { pcrPrefix, pcrBreedCode },
       orderBy: { pcrIncremental: 'desc' },
     });
-
     const nextInc = lastLitter ? parseInt(lastLitter.pcrIncremental) + 1 : 1;
     const pcrIncremental = nextInc.toString().padStart(5, '0');
     const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
-    const pcrId = `PCR-L${pcrBreedCode}-${dto.generation}-${pcrIncremental}-${pcrRandom}`;
-    const tier =
-      breed.type === 'DESIGNER' ? RegistryTier.GOLD : RegistryTier.BLUE;
 
-    if (dto.microchipId) {
-      const existing = await tx.litter.findUnique({
-        where: { microchipId: dto.microchipId },
-      });
-      if (existing) throw new ConflictException('Microchip ID already exists');
-    }
-
-    const newLitter = await tx.litter.create({
+    // Create Parent Litter Record
+    const litter = await tx.litter.create({
       data: {
-        ...dto,
-        pcrId,
-        pcrPrefix: 'L',
+        pcrId: `PCR-${pcrPrefix}${pcrBreedCode}-${gen}-${pcrIncremental}-${pcrRandom}`,
+        pcrPrefix,
         pcrBreedCode,
+        generation: gen,
         pcrIncremental,
         pcrRandom,
-        tier,
+        tier: breed.type === 'DESIGNER' ? 'GOLD' : 'BLUE',
+        name: dto.litterName,
+        breedId: dto.breedId,
         dateOfBirth: new Date(dto.dateOfBirth),
+        motherPcrId: dto.motherPcrId,
+        fatherPcrId: dto.fatherPcrId,
+        city: dto.city,
+        state: dto.state,
+        zipCode: dto.zipCode,
+        country: dto.country,
         ownerId: userId,
+        status: 'PENDING',
+        requestType: 'LITTER_REGISTRATION',
         images: {
-          create: (imageUrlList as any)
-            .filter((img: any) => img?.url && img?.publicId)
-            .map((img: any) => ({
-              url: img.url,
-              publicId: img.publicId,
-            })),
+          create: imageUrls.map((url) => ({
+            url,
+            publicId: url.split('/').pop(),
+          })),
         },
         DNAdocuments: {
-          create: docUrlList.map((doc: any) => ({
-            url: doc.url,
-            publicId: doc.publicId,
+          create: docUrls.map((url) => ({
+            url,
+            name: 'Litter DNA',
+            publicId: url.split('/').pop(),
           })),
         },
       },
-      include: {
-        images: true,
-        DNAdocuments: true,
-        mother: true,
-        father: true,
-      },
     });
 
-    await this.notificationsService.alertAdmins({
-      title: 'Litter Registration',
-      message: `A new litter ${pcrId} has been registered.`,
-      category: ResourceType.CANINE,
-      link: `/admin/litters/${newLitter.id}`,
-      sourceId: newLitter.id,
-    });
+    // Create Puppies Loop
+    if (dto.puppies && Array.isArray(dto.puppies)) {
+      for (const [idx, pup] of dto.puppies.entries()) {
+        const pupPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
+        const pupInc = (nextInc + idx).toString().padStart(5, '0');
+        const pupRand = Math.floor(100000 + Math.random() * 900000).toString();
 
-    return newLitter;
+        await tx.canine.create({
+          data: {
+            pcrId: `PCR-${pupPrefix}${pcrBreedCode}-${gen}-${pupInc}-${pupRand}`,
+            pcrPrefix: pupPrefix,
+            pcrBreedCode: pcrBreedCode,
+            pcrIncremental: pupInc,
+            pcrRandom: pupRand,
+            generation: gen,
+            name: pup.name,
+            gender: pup.gender,
+            color: pup.color,
+            weight: Number(pup.weight),
+            microchipId: pup.microchipId,
+            dateOfBirth: new Date(dto.dateOfBirth),
+            ownerId: userId,
+            breedId: dto.breedId,
+            litterId: litter.id, // Linking pup to litter
+            tier: pupPrefix === 'G' ? 'GOLD' : 'BLUE',
+            city: dto.city,
+            state: dto.state,
+            country: dto.country,
+            zipCode: dto.zipCode,
+            healthStatus: pup.healthStatus || 'EXCELLENT',
+            vaccinations: pup.vaccinations || [], // Array string handle korbe
+            healthClearances: pup.healthClearances || [],
+            DNAdocuments: {
+              create: docUrls.map((url) => ({
+                url,
+                name: `${pup.name} DNA Record`,
+                publicId: url.split('/').pop(),
+              })),
+            },
+            images: {
+              create: imageUrls.map((url) => ({
+                url,
+                publicId: url.split('/').pop(),
+              })),
+            },
+          },
+        });
+      }
+    }
+    return litter;
   }
 
   async findAll(query: LitterQueryDto) {
@@ -339,46 +382,65 @@ export class LitterService {
       );
     }
   }
-  async update(litterId: string, dto: UpdateLitterDto) {
-    try {
-      // Existence check
-      await this.findOne(litterId);
 
-      // Microchip unique check jodi update e thake
-      if (dto.microchipId) {
-        const existing = await this.prisma.litter.findFirst({
-          where: {
-            microchipId: dto.microchipId,
-            id: { not: litterId },
-          },
-        });
-        if (existing)
-          throw new ConflictException(
-            'Microchip ID already in use by another litter',
-          );
+  async update(litterId: string, dto: UpdateLitterDto, userId: string) {
+    try {
+      const existingLitter = await this.prisma.litter.findUnique({
+        where: { id: litterId },
+      });
+
+      if (!existingLitter)
+        throw new NotFoundException(`Litter with ID ${litterId} not found`);
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      const isSuperAdmin = user?.roleType === 'SUPER_ADMIN';
+      if (!isSuperAdmin && existingLitter.ownerId !== userId) {
+        throw new ForbiddenException(
+          'You do not have permission to update this litter',
+        );
       }
+
+      // 4. CRITICAL: Removing relational and restricted fields from the main update data
+      const {
+        puppies,
+        images,
+        DNAdocuments,
+        vaccinations,
+        healthClearances,
+        breedId,
+        motherPcrId,
+        fatherPcrId,
+        dateOfBirth,
+        litterName,
+        // Admin specific fields (Destructured to handle separately or pass if admin)
+        status,
+        tier,
+        ...updateData
+      } = dto;
 
       return await this.prisma.litter.update({
         where: { id: litterId },
         data: {
-          ...dto,
-          dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+          ...updateData,
+          name: litterName || undefined,
+          dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+          // Only Admin can change these
+          ...(isSuperAdmin && {
+            status: status as any,
+            tier: tier as any,
+          }),
+          ...(vaccinations && { vaccinations: { set: vaccinations as any } }),
+          ...(healthClearances && {
+            healthClearances: { set: healthClearances as any },
+          }),
         },
-        include: {
-          images: true,
-          DNAdocuments: true,
-        },
+        include: { images: true, DNAdocuments: true, puppies: true },
       });
     } catch (error: any) {
       this.logger.error(`Failed to update litter: ${error.message}`);
-      if (
-        error instanceof NotFoundException ||
-        error instanceof ConflictException
-      )
-        throw error;
-      throw new InternalServerErrorException(
-        'An error occurred while updating the litter',
-      );
+      throw error;
     }
   }
 
