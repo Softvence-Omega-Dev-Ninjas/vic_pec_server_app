@@ -10,12 +10,13 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/main/prisma/prisma.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { RegisterCanineDto, UpdateCanineDto } from './dto/create-canine.dto';
 import { CanineQueryDto } from './dto/canine-query.dto';
-import { RegistryTier, ResourceType } from 'generated/prisma/enums';
+// import { RegistryTier, ResourceType } from 'generated/prisma/enums';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { PaymentService } from '../payment/payment.service';
 
@@ -37,132 +38,94 @@ export class CanineService {
     images: Express.Multer.File[],
     docs: Express.Multer.File[],
   ) {
-    try {
-      const breed = await this.prisma.breed.findUnique({
-        where: { id: dto.breedId },
+    const breed = await this.prisma.breed.findUnique({
+      where: { id: dto.breedId },
+    });
+    if (!breed) throw new NotFoundException('Breed not found');
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        membership: { include: { servicePricings: true } },
+        _count: { select: { canines: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const [imageUrlList, docUrlList] = await Promise.all([
+      this.cloudinary.uploadImages(images),
+      this.cloudinary.uploadImages(docs),
+    ]);
+
+    // Membership limit check
+    const limit = user?.membership?.canineLimit || 0;
+    if (user._count.canines >= limit) {
+      return await this.paymentService.createExtraCanineSession(
+        userId,
+        dto,
+        imageUrlList as string[],
+        docUrlList as string[],
+      );
+    }
+
+    // PCR ID Logic (No Generation for Individual Reg)
+    const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
+    const lastCanine = await this.prisma.canine.findFirst({
+      where: { pcrPrefix, pcrBreedCode: breed.breedCode },
+      orderBy: { pcrIncremental: 'desc' },
+    });
+
+    const nextInc = lastCanine ? parseInt(lastCanine.pcrIncremental) + 1 : 1;
+    const pcrIncremental = nextInc.toString().padStart(5, '0');
+    const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
+    const pcrId = `PCR-${pcrPrefix}${breed.breedCode}-${pcrIncremental}-${pcrRandom}`;
+
+    return await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.canine.findUnique({
+        where: { microchipId: dto.microchipId },
       });
+      if (existing) throw new ConflictException('Microchip ID already exists');
 
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        include: { membership: true, _count: { select: { canines: true } } },
-      });
-      if (!user) {
-        throw Error('User not found!');
-      }
-      const limit = user?.membership?.canineLimit || 0;
-
-      if (user._count.canines >= limit) {
-        const [imageUrlList, docUrlList] = await Promise.all([
-          this.cloudinary.uploadImages(images),
-          this.cloudinary.uploadImages(docs),
-        ]);
-
-        return await this.paymentService.createExtraCanineSession(
-          userId,
-          dto,
-          imageUrlList as string[],
-          docUrlList as string[],
-        );
-      }
-
-      if (!breed) {
-        throw new NotFoundException(`Breed with ID ${dto.breedId} not found`);
-      }
-
-      const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
-      const pcrBreedCode = breed.breedCode;
-
-      if (breed.type === 'DESIGNER' && !dto.generation) {
-        throw new BadRequestException(
-          'Generation is required for Designer breeds',
-        );
-      }
-
-      const lastCanine = await this.prisma.canine.findFirst({
-        where: { pcrPrefix, pcrBreedCode },
-        orderBy: { pcrIncremental: 'desc' },
-      });
-
-      const nextInc = lastCanine ? parseInt(lastCanine.pcrIncremental) + 1 : 1;
-      const pcrIncremental = nextInc.toString().padStart(5, '0');
-      const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
-      const pcrId = `PCR-${pcrPrefix}${pcrBreedCode}-${pcrIncremental}-${pcrRandom}`;
-
-      const [imageUrlList, docUrlList] = await Promise.all([
-        this.cloudinary.uploadImages(images),
-        this.cloudinary.uploadImages(docs),
-      ]);
-      const tier = pcrPrefix === 'G' ? RegistryTier.GOLD : RegistryTier.BLUE;
-
-      const newCanine = await this.prisma.$transaction(async (tx) => {
-        const existing = await tx.canine.findUnique({
-          where: { microchipId: dto.microchipId },
-        });
-
-        if (existing) {
-          throw new ConflictException('Microchip ID already exists');
-        }
-
-        return await tx.canine.create({
-          data: {
-            ...dto,
-            dateOfBirth: new Date(dto.dateOfBirth),
-            pcrId,
-            pcrPrefix,
-            pcrBreedCode,
-            pcrIncremental,
-            pcrRandom,
-            tier,
-            ownerId: userId,
-            images: {
-              create: (imageUrlList as string[]).map((url) => ({
-                url,
-                publicId:
-                  url.split('/').pop()?.split('.')[0] ||
-                  `img-${Math.random().toString(36).substring(7)}`,
-              })),
-            },
-            DNAdocuments: {
-              create: (docUrlList as string[]).map((url) => ({
-                url,
-                name: 'Canine DNA Report',
-                publicId:
-                  url.split('/').pop()?.split('.')[0] ||
-                  `doc-${Math.random().toString(36).substring(7)}`,
-              })),
-            },
+      const canine = await tx.canine.create({
+        data: {
+          ...dto,
+          generation: null, // Strictly null for main registration
+          pcrId,
+          pcrPrefix,
+          pcrBreedCode: breed.breedCode,
+          pcrIncremental,
+          pcrRandom,
+          tier: pcrPrefix === 'G' ? 'GOLD' : 'BLUE',
+          ownerId: userId,
+          dateOfBirth: new Date(dto.dateOfBirth),
+          images: {
+            create: (imageUrlList as string[]).map((url) => ({
+              url,
+              publicId:
+                url.split('/').pop()?.split('.')[0] || `img-${Date.now()}`,
+            })),
           },
-          include: {
-            images: true,
-            DNAdocuments: true,
-            breedRelation: { select: { name: true, breedCode: true } },
-            owner: { select: { fullName: true, pcrId: true } },
+          DNAdocuments: {
+            create: (docUrlList as string[]).map((url) => ({
+              url,
+              name: 'DNA Report',
+              publicId:
+                url.split('/').pop()?.split('.')[0] || `doc-${Date.now()}`,
+            })),
           },
-        });
+        },
       });
 
       await this.notificationsService.alertAdmins({
         title: 'New Canine Registry',
-        message: `A new canine "${newCanine.name}" has been registered.`,
-        category: ResourceType.CANINE,
-        link: `/admin/canines/${newCanine.id}`,
-        sourceId: newCanine.id,
+        message: `A new canine "${canine.name}" has been registered.`,
+        category: 'CANINE',
+        link: `/admin/canines/${canine.id}`,
+        sourceId: canine.id,
       });
 
-      return newCanine;
-    } catch (error: any) {
-      this.logger.error(`Canine registration failed: ${error.message}`);
-      if (
-        error instanceof ConflictException ||
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException
-      ) {
-        throw error;
-      }
-      throw new InternalServerErrorException(
-        error.message || 'Failed to register canine',
-      );
-    }
+      return canine;
+    });
   }
 
   // 2. Find All Canines (with Pagination, Filter, Search)
@@ -321,45 +284,69 @@ export class CanineService {
     role: string,
   ) {
     try {
-      const existingCanine = await this.findOne(canineId);
+      // 1. Fetch existing canine
+      const existingCanine = await this.prisma.canine.findUnique({
+        where: { id: canineId },
+      });
 
-      // Ownership Check
-      if (role !== 'SUPER_ADMIN' && existingCanine.ownerId !== userId) {
-        throw new ConflictException(
+      if (!existingCanine) {
+        throw new NotFoundException(`Canine with ID ${canineId} not found`);
+      }
+
+      // Ownership & Role Check
+      const isSuperAdmin = role === 'SUPER_ADMIN';
+      if (!isSuperAdmin && existingCanine.ownerId !== userId) {
+        throw new ForbiddenException(
           'You do not have permission to update this canine',
         );
       }
 
-      if (dto.microchipId) {
+      // 2. Microchip uniqueness check
+      if (dto.microchipId && dto.microchipId !== existingCanine.microchipId) {
         const microchipCheck = await this.prisma.canine.findFirst({
-          where: { microchipId: dto.microchipId, id: { not: canineId } },
+          where: {
+            microchipId: dto.microchipId,
+            id: { not: canineId },
+          },
         });
-        if (microchipCheck)
+        if (microchipCheck) {
           throw new ConflictException('Microchip ID already in use');
+        }
       }
 
-      // 1. Destructure fields that are not part of the database columns or need special handling
-      const { images, DNAdocuments, dateOfBirth, ...updateData } = dto;
+      // 3. Destructure & Exclude sensitive fields
+      const { images, DNAdocuments, dateOfBirth, breedId, ...updateData } = dto;
 
+      // 4. Perform Update
       return await this.prisma.canine.update({
         where: { id: canineId },
         data: {
           ...updateData,
-          // 2. Explicitly handle Date conversion
+          // String to Date conversion
           dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-          // Note: Images and Documents update logic separate thaka bhalo,
-          // kintu ekhane error solve korte hole egulo data object theke exclude korte hobe.
+
+          // Strictly block generation update here
+          // Individual canine er generation update kora jabe na
+        },
+        include: {
+          images: true,
+          DNAdocuments: true,
+          breedRelation: {
+            select: { name: true, breedCode: true },
+          },
         },
       });
     } catch (error: any) {
       this.logger.error(`Failed to update canine: ${error.message}`);
       if (
         error instanceof NotFoundException ||
-        error instanceof ConflictException
-      )
+        error instanceof ConflictException ||
+        error instanceof ForbiddenException
+      ) {
         throw error;
+      }
       throw new InternalServerErrorException(
-        'An error occurred while updating the canine',
+        error.message || 'An error occurred while updating the canine',
       );
     }
   }

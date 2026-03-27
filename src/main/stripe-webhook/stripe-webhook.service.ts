@@ -14,11 +14,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
 import { NotificationsService } from 'src/notifications/notifications.service';
-import {
-  CanineStatus,
-  ServiceType,
-  SubscriptionStatus,
-} from 'generated/prisma/enums';
+import { SubscriptionStatus } from 'generated/prisma/enums';
 import { LitterService } from '../litter/litter.service';
 
 @Injectable()
@@ -159,116 +155,153 @@ export class StripeWebhookService {
   private async handleExtraCaninePayment(session: Stripe.Checkout.Session) {
     const userId = session.client_reference_id;
     const meta = session.metadata;
+    if (!userId || !meta?.canineData) return;
 
-    if (!userId || !meta?.canineData) {
-      this.logger.error('Missing metadata for Extra Canine Registration');
-      return;
-    }
+    const basic = JSON.parse(meta.canineData);
+    const location = JSON.parse(meta.locationData || '{}');
+    const health = JSON.parse(meta.healthData || '{}');
+    const imageUrls = JSON.parse(meta.imageUrls || '[]');
+    const docUrls = JSON.parse(meta.docUrls || '[]');
 
-    try {
-      // 1. Parse all split metadata keys
-      const basic = JSON.parse(meta.canineData);
-      const location = JSON.parse(meta.locationData || '{}');
-      const health = JSON.parse(meta.healthData || '{}');
-      const imageUrls: string[] = JSON.parse(meta.imageUrls || '[]');
-      const docUrls: string[] = JSON.parse(meta.docUrls || '[]');
+    await this.prisma.$transaction(async (tx) => {
+      const breed = await tx.breed.findUnique({ where: { id: basic.breedId } });
+      if (!breed) throw new Error('Breed not found');
 
-      // 2. Reconstruct canineDto to match Database Schema
-      const canineDto = {
-        name: basic.name,
-        breedId: basic.breedId,
-        gender: basic.gender,
-        dateOfBirth: new Date(basic.dob), // String theke Date object
-        color: basic.color,
-        weight: basic.weight,
-        microchipId: basic.microchip,
-        city: location.city,
-        state: location.state,
-        country: location.country,
-        zipCode: location.zip,
-        healthStatus: health.status,
-        primaryBreedDNA: health.pDNA,
-        secondaryBreedDNA: health.sDNA,
-        vaccinations: health.vacs,
-        healthClearances: health.clear,
-      };
-
-      await this.prisma.$transaction(async (tx) => {
-        // 3. Fetch Breed for PCR ID Logic
-        const breed = await tx.breed.findUnique({
-          where: { id: canineDto.breedId },
-        });
-
-        if (!breed)
-          throw new Error(`Breed not found for ID: ${canineDto.breedId}`);
-
-        const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
-        const lastCanine = await tx.canine.findFirst({
-          where: {
-            pcrPrefix,
-            pcrBreedCode: breed.breedCode,
-          },
-          orderBy: { pcrIncremental: 'desc' },
-        });
-
-        const nextInc = lastCanine
-          ? parseInt(lastCanine.pcrIncremental) + 1
-          : 1;
-        const pcrIncremental = nextInc.toString().padStart(5, '0');
-        const pcrRandom = Math.floor(
-          100000 + Math.random() * 900000,
-        ).toString();
-        const pcrId = `PCR-${pcrPrefix}${breed.breedCode}-${pcrIncremental}-${pcrRandom}`;
-
-        // 4. Create the Canine Record
-        const newCanine = await tx.canine.create({
-          data: {
-            ...canineDto, // Reconstructed object
-            pcrId,
-            pcrPrefix,
-            pcrBreedCode: breed.breedCode,
-            pcrIncremental,
-            pcrRandom,
-            ownerId: userId,
-            status: CanineStatus.PENDING,
-            tier: pcrPrefix === 'G' ? 'GOLD' : 'BLUE',
-            images: {
-              create: imageUrls.map((url) => ({
-                url,
-                publicId:
-                  url.split('/').pop()?.split('.')[0] || `img-${Date.now()}`,
-              })),
-            },
-            DNAdocuments: {
-              create: docUrls.map((url) => ({
-                url,
-                name: 'Canine DNA Report',
-                publicId:
-                  url.split('/').pop()?.split('.')[0] || `doc-${Date.now()}`,
-              })),
-            },
-          },
-        });
-
-        await tx.transaction.create({
-          data: {
-            stripeSessionId: session.id,
-            userId: userId,
-            serviceType: ServiceType.CANINE_REG, // ServiceType enum theke
-            amount: session.amount_total ? session.amount_total / 100 : 0,
-            status: SubscriptionStatus.PAID,
-            resourceId: newCanine.id, // Newly created canine er ID
-          },
-        });
+      const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
+      const lastCanine = await tx.canine.findFirst({
+        where: { pcrPrefix, pcrBreedCode: breed.breedCode },
+        orderBy: { pcrIncremental: 'desc' },
       });
 
-      this.logger.log(
-        `Successfully registered extra canine for user ${userId}`,
+      const nextInc = lastCanine ? parseInt(lastCanine.pcrIncremental) + 1 : 1;
+      const pcrIncremental = nextInc.toString().padStart(5, '0');
+      const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
+      const pcrId = `PCR-${pcrPrefix}${breed.breedCode}-${pcrIncremental}-${pcrRandom}`;
+
+      const newCanine = await tx.canine.create({
+        data: {
+          name: basic.name,
+          gender: basic.gender,
+          dateOfBirth: new Date(basic.dob),
+          color: basic.color,
+          weight: basic.weight,
+          microchipId: basic.microchip,
+          city: location.city,
+          state: location.state,
+          country: location.country,
+          zipCode: location.zip,
+          generation: null, // Strictly null
+          pcrId,
+          pcrPrefix,
+          pcrBreedCode: breed.breedCode,
+          pcrIncremental,
+          pcrRandom,
+          ownerId: userId,
+          breedId: breed.id,
+          tier: pcrPrefix === 'G' ? 'GOLD' : 'BLUE',
+          primaryBreedDNA: health.pDNA,
+          secondaryBreedDNA: health.sDNA,
+          healthStatus: health.status,
+          vaccinations: health.vacs,
+          healthClearances: health.clear,
+          images: {
+            create: imageUrls.map((url) => ({
+              url,
+              publicId: url.split('/').pop(),
+            })),
+          },
+          DNAdocuments: {
+            create: docUrls.map((url) => ({
+              url,
+              name: 'DNA Report',
+              publicId: url.split('/').pop(),
+            })),
+          },
+        },
+      });
+
+      await tx.transaction.create({
+        data: {
+          stripeSessionId: session.id,
+          userId,
+          serviceType: 'CANINE_REG',
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          status: 'PAID',
+          resourceId: newCanine.id,
+        },
+      });
+    });
+  }
+
+  private async handleLitterPayment(session: Stripe.Checkout.Session) {
+    const userId = session.client_reference_id;
+    const meta = session.metadata;
+
+    if (!userId || !meta?.b) return;
+
+    const b = JSON.parse(meta.b);
+    const l = JSON.parse(meta.l);
+    const p = JSON.parse(meta.p || '[]');
+    const imgs = JSON.parse(meta.imgs || '[]');
+    const docs = JSON.parse(meta.docs || '[]');
+
+    // Mapping back to DTO structure for the execute function
+    const dto = {
+      litterName: b.n,
+      breedId: b.bid,
+      dateOfBirth: b.dob,
+      motherPcrId: b.mid,
+      fatherPcrId: b.fid,
+      city: l.c,
+      state: l.s,
+      zipCode: l.z,
+      country: l.co,
+      puppies: p.map((pup: any) => ({
+        name: pup.n,
+        gender: pup.g,
+        color: pup.c,
+        weight: pup.w,
+        microchipId: pup.m,
+        healthStatus: pup.hs,
+        vaccinations: pup.v,
+        healthClearances: pup.hc,
+      })),
+    };
+
+    await this.prisma.$transaction(async (tx) => {
+      const breed = await tx.breed.findUnique({ where: { id: dto.breedId } });
+
+      // Call the same DB execution logic used in Free registration
+      const newLitter = await this.litterService.executeLitterCreation(
+        tx,
+        userId,
+        dto,
+        b.gen, // Generation calculated at session creation
+        imgs,
+        docs,
+        breed,
       );
-    } catch (error: any) {
-      this.logger.error(`Webhook Extra Canine Error: ${error.message}`);
-      throw new InternalServerErrorException(error.message);
-    }
+
+      // Save payment transaction record
+      await tx.transaction.create({
+        data: {
+          stripeSessionId: session.id,
+          userId,
+          serviceType: 'LITTER_REG',
+          amount: session.amount_total ? session.amount_total / 100 : 0,
+          status: 'PAID',
+          resourceId: newLitter.id,
+        },
+      });
+
+      // Alert admins
+      await this.notificationsService.alertAdmins({
+        title: 'New Litter Paid',
+        message: `A new litter "${newLitter.name}" has been registered via Stripe.`,
+        category: 'CANINE',
+        sourceId: newLitter.id,
+      });
+    });
   }
 
   private async handleFailedPayment(session: any) {
@@ -295,27 +328,6 @@ export class StripeWebhookService {
         );
       }
     }
-  }
-
-  private async handleLitterPayment(session: Stripe.Checkout.Session) {
-    const userId = session.client_reference_id!;
-    const dto = JSON.parse(session.metadata!.litterData);
-    const imageUrls = JSON.parse(session.metadata!.imageUrls);
-    const docUrls = JSON.parse(session.metadata!.docUrls);
-
-    await this.prisma.$transaction(async (tx) => {
-      const breed = await tx.breed.findUnique({ where: { id: dto.breedId } });
-      if (!breed) throw new Error(`Breed not found: ${dto.breedId}`);
-
-      await this.litterService.executeLitterCreation(
-        tx,
-        userId,
-        dto,
-        imageUrls,
-        docUrls,
-        breed,
-      );
-    });
   }
 
   private async handleSubscriptionStatusUpdate(

@@ -1,66 +1,64 @@
 model Litter {
   id                String            @id @default(uuid())
-
-  pcrId            String   @unique // Example: 'PCR-L301-F1B-00001-564738'
+  pcrId             String            @unique // e.g., PCR-L301-F1B-00001-564738
   
   // ID Components
-  pcrPrefix        String   @default("L")
-  pcrBreedCode     String   // '301', '302' etc.
-  generation       String   // 'F1', 'F1B', 'F2'
-  pcrIncremental   String   // '00001' (Tracked for reuse)
-  pcrRandom        String   // '564738' (6-digit security part)
-  tier         RegistryTier  @default(BLUE)
+  pcrPrefix         String            @default("L")
+  pcrBreedCode      String            
+  generation        String            // Parents theke auto-calculate hoye ekhane boshibe
+  pcrIncremental    String            
+  pcrRandom         String            
+  tier              RegistryTier      @default(BLUE)
   
-  breedId          String
-  breedRelation    Breed    @relation(fields: [breedId], references: [id])
+  breedId           String
+  breedRelation     Breed             @relation(fields: [breedId], references: [id])
 
-
-  name              String
-  gender            Gender
+  name              String?           // Optional: Litter Name (e.g., "A-Litter")
   dateOfBirth       DateTime
 
-  color             String
-  weight            Float
-
+  // Location (Common for the whole group)
   city              String
   state             String
   zipCode           String
   country           String
-  microchipId       String           @unique
-  healthStatus      String            @default("Excellent")
-  vaccinations      VaccinationType[]
-  healthClearances  HealthClearance[]
-  healthNotes       String?           @db.Text
 
-  images            Image[]             @relation("LitterImages")
-  DNAdocuments      Document[]          @relation("LitterDocuments")
-  transfers         OwnershipTransfer[] @relation("LitterTransfers")
-
+  // Parent Relations (Manual linkage or PCR verified)
   motherPcrId       String?
   mother            Canine?           @relation("MotherRelation", fields: [motherPcrId], references: [pcrId])
   fatherPcrId       String?
   father            Canine?           @relation("FatherRelation", fields: [fatherPcrId], references: [pcrId])
 
-  // User Relations (Fixed Ambiguity)
+  // Logic: Parents verified hole true hobe (No DNA needed for pups)
+  isAutoDNAVerified Boolean           @default(false) 
+
+  // Owner Relation (Breeder/Current Owner)
   ownerId           String
   owner             User              @relation("LitterOwner", fields: [ownerId], references: [id])
 
-
-  healthRequests   CanineHealthRequest[] @relation("LitterHealthRequests")
-
-  reports     Report[] @relation("LitterReports")
-
-  requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
-  status            CanineStatus       @default(PENDING)
-  assignedTier      VerificationType    @default(NONE)  
-
-  certificateRequests CertificateRequest[] @relation("LitterCertRequests") 
-
-  // Puppies registered in this litter session
+  // One-to-Many: Multiple puppies in one litter
   puppies           Canine[]          @relation("LitterPuppies")
+
+  // System Relations
+  images            Image[]           @relation("LitterImages")
+  DNAdocuments      Document[]        @relation("LitterDocuments")
+  healthRequests    CanineHealthRequest[] @relation("LitterHealthRequests")
+  reports           Report[]          @relation("LitterReports")
+  certificateRequests CertificateRequest[] @relation("LitterCertRequests") 
+  transfers         OwnershipTransfer[] @relation("LitterTransfers")
+
+  status            CanineStatus      @default(PENDING)
+  requestType       RegistrationRequestType @default(LITTER_REGISTRATION)
+  assignedTier      VerificationType  @default(NONE)
 
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
   @@map("litters")
+}
+
+
+enum RegistrationRequestType {
+  NEW_REGISTRATION
+  LITTER_REGISTRATION
+  TRANSFER_REGISTRATION
 }

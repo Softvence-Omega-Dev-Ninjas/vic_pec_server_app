@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -34,6 +35,7 @@ import {
   UpdateLitterDto,
 } from '../litter/dto/create-litter.dto';
 import { LitterQueryDto } from './dto/LitterQueryDto';
+import { plainToInstance } from 'class-transformer';
 
 @ApiTags('Litter Management')
 @ApiBearerAuth()
@@ -48,21 +50,29 @@ export class LitterController {
   @ApiOperation({ summary: 'Register a new litter with images and documents' })
   @UseInterceptors(
     FileFieldsInterceptor([
-      { name: 'images', maxCount: 10 },
-      { name: 'docs', maxCount: 5 },
+      { name: 'images', maxCount: 5 },
+      { name: 'DNAdocuments', maxCount: 2 }, // Ekhane 'docs' chhilo, eta change hobe
     ]),
   )
   async register(
-    @Body() dto: CreateLitterDto,
+    @Body() body: any,
     @Req() req: any,
     @UploadedFiles()
-    files: { images?: Express.Multer.File[]; docs?: Express.Multer.File[] },
+    files: {
+      images?: Express.Multer.File[];
+      DNAdocuments?: Express.Multer.File[];
+    },
   ) {
+    if (typeof body.puppies === 'string') {
+      body.puppies = JSON.parse(body.puppies);
+    }
+    const dto = plainToInstance(CreateLitterDto, body);
+
     return await this.litterService.createLitter(
       req.userId,
       dto,
       files.images || [],
-      files.docs || [],
+      files.DNAdocuments || [],
     );
   }
 
@@ -93,8 +103,9 @@ export class LitterController {
   async update(
     @Param('litterId') litterId: string,
     @Body() dto: UpdateLitterDto,
+    @Req() req: any,
   ) {
-    return await this.litterService.update(litterId, dto);
+    return await this.litterService.update(litterId, dto, req.userId);
   }
 
   @Delete('admin/:litterId')
