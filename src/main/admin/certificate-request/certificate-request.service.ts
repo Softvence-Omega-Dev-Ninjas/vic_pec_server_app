@@ -220,7 +220,7 @@ export class CertificateRequestService {
           select: { name: true, pcrId: true, images: true, microchipId: true },
         },
         litter: {
-          select: { name: true, pcrId: true, images: true, microchipId: true },
+          select: { name: true, pcrId: true, images: true },
         },
       },
       orderBy: { createdAt: 'desc' },

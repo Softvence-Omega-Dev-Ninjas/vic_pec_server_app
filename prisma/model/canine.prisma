@@ -1,75 +1,72 @@
 model Canine {
-  id                String              @id @default(uuid())
-
-  // ID separation for better management
-  pcrId            String   @unique // e.g., PCR-G301-00001-123456
-  // ID Components
-  pcrPrefix        String   // 'G' or 'B'
-  pcrBreedCode     String   // '301'
-  generation       String?  // 'F1', 'F1B'
-  pcrIncremental   String   // '00001'
-  pcrRandom        String   // '123456'
-  tier         RegistryTier  @default(BLUE)
+  id                String            @id @default(uuid())
+  pcrId             String            @unique // e.g., PCR-G301-00001-123456
   
-  // Relations
-  breedId          String
-  breedRelation    Breed    @relation(fields: [breedId], references: [id])
+  // Visibility Logic
+  isPublicProfile   Boolean           @default(false) // FALSE till transfer/reg
+  hasPedigreeAgreement Boolean        @default(false) // Checkbox for OTTC
 
+  // ID Components
+  pcrPrefix         String            // 'G' or 'B'
+  pcrBreedCode      String            
+  generation        String?           
+  pcrIncremental    String            
+  pcrRandom         String            
+  tier              RegistryTier      @default(BLUE)
+  
+  breedId           String
+  breedRelation     Breed             @relation(fields: [breedId], references: [id])
 
-  name              String
+  name              String            // Puppy's name
   gender            Gender
-  dateOfBirth       DateTime
+  dateOfBirth       DateTime          // Inherited from Litter
   color             String
   weight            Float
+  microchipId       String?           @unique
+
+  // Location (Initially inherited from Litter, can be updated)
   city              String
   state             String
   zipCode           String
   country           String
-  microchipId       String             @unique
 
-
-  primaryBreedDNA   String
+  // DNA & Health
+  primaryBreedDNA   String?           // Auto-linked from parents if possible
   secondaryBreedDNA String?
-  healthStatus      String              @default("Excellent")
+  healthStatus      String            @default("Excellent")
   vaccinations      VaccinationType[]
   healthClearances  HealthClearance[]
-  healthNotes       String?             @db.Text
-  DNAdocuments      Document[]          @relation("CanineDocuments")
+  healthNotes       String?           @db.Text
+  DNAdocuments      Document[]        @relation("CanineDocuments")
 
-
-  images            Image[]             @relation("CanineImages")
-
-  transfers         OwnershipTransfer[] @relation("CanineTransfers")
-
-  // Owner Relation
+  // Relations
   ownerId           String
-  owner             User                @relation("UserCanines", fields: [ownerId], references: [id])
+  owner             User              @relation("UserCanines", fields: [ownerId], references: [id])
 
-  // Litter Relation
+  // Link to Birth Litter
   litterId          String?
-  litter            Litter?             @relation("LitterPuppies", fields: [litterId], references: [id], onDelete: Cascade)
+  litter            Litter?           @relation("LitterPuppies", fields: [litterId], references: [id], onDelete: Cascade)
 
-  // Pedigree History
-  asMother          Litter[]            @relation("MotherRelation")
-  asFather          Litter[]            @relation("FatherRelation")
+  // Pedigree Tree (When this canine becomes a parent)
+  asMother          Litter[]          @relation("MotherRelation")
+  asFather          Litter[]          @relation("FatherRelation")
 
-  healthRequests         CanineHealthRequest[] @relation("CanineHealthRequests")
-
-  reports     Report[] @relation("CanineReports")
-
-
-  requestType       RegistrationRequestType         @default(NEW_REGISTRATION)
-  status            CanineStatus       @default(PENDING) 
-  assignedTier      VerificationType    @default(NONE)  
-
+  // Baki Relations
+  images            Image[]           @relation("CanineImages")
+  transfers         OwnershipTransfer[] @relation("CanineTransfers")
+  healthRequests    CanineHealthRequest[] @relation("CanineHealthRequests")
+  reports           Report[]          @relation("CanineReports")
   certificateRequests CertificateRequest[] @relation("CanineCertRequests") 
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  status            CanineStatus      @default(PENDING) 
+  requestType       RegistrationRequestType @default(NEW_REGISTRATION)
+  assignedTier      VerificationType  @default(NONE)  
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@map("canines")
 }
-
 
 enum RegistryTier {
   GOLD

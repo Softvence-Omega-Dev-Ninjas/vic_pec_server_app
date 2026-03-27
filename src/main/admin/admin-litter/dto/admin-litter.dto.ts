@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsOptional,
   IsString,
@@ -8,10 +6,11 @@ import {
   IsInt,
   Min,
   IsIn,
-  IsNumber,
+  IsDateString,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CanineStatus, Gender, RegistryTier } from 'generated/prisma/enums';
+import { CanineStatus, RegistryTier } from 'generated/prisma/enums';
 
 export class AdminLitterQueryDto {
   @ApiPropertyOptional({ example: 1 })
@@ -55,43 +54,51 @@ export class AdminLitterQueryDto {
 }
 
 export class UpdateLitterAdminDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Golden Guardians Litter A' })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ enum: CanineStatus })
+  @ApiPropertyOptional({
+    enum: CanineStatus,
+    description: 'Change status for litter and all puppies',
+  })
   @IsOptional()
   @IsEnum(CanineStatus)
   status?: CanineStatus;
 
-  @ApiPropertyOptional({ enum: RegistryTier })
+  @ApiPropertyOptional({
+    enum: RegistryTier,
+    description: 'Change tier for litter and all puppies',
+  })
   @IsOptional()
   @IsEnum(RegistryTier)
   tier?: RegistryTier;
 
-  @ApiPropertyOptional({ enum: Gender })
+  @ApiPropertyOptional({ example: '2026-01-15' })
   @IsOptional()
-  @IsEnum(Gender)
-  gender?: Gender;
+  @IsDateString()
+  dateOfBirth?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  color?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  weight?: number;
-
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Excellent' })
   @IsOptional()
   @IsString()
   healthStatus?: string;
 
+  // Location fields update korar option thaka bhalo
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  microchipId?: string;
+  city?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  zipCode?: string;
+  @ApiProperty({ example: 'USA' }) @IsString() @IsNotEmpty() country!: string;
 }
