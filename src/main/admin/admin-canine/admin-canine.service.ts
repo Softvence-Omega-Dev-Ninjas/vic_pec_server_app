@@ -72,14 +72,86 @@ export class AdminCanineService {
         breedRelation: true,
         images: true,
         DNAdocuments: true,
-        litter: { include: { breedRelation: true } },
-        asMother: { take: 5 },
-        asFather: { take: 5 },
+        litter: {
+          include: {
+            breedRelation: true,
+            mother: {
+              include: {
+                breedRelation: true,
+                images: { take: 1 },
+              },
+            },
+            father: {
+              include: {
+                breedRelation: true,
+                images: { take: 1 },
+              },
+            },
+          },
+        },
+        asMother: {
+          include: {
+            breedRelation: true,
+            puppies: {
+              take: 5,
+              include: { images: { take: 1 } },
+            },
+          },
+        },
+        asFather: {
+          include: {
+            breedRelation: true,
+            puppies: {
+              take: 5,
+              include: { images: { take: 1 } },
+            },
+          },
+        },
+        transfers: {
+          include: {
+            currentOwner: true,
+            newOwner: true,
+            requests: {
+              include: {
+                user: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+        healthRequests: true,
+        reports: true,
+        certificateRequests: true,
       },
     });
 
     if (!canine) throw new NotFoundException('Canine record not found');
-    return { success: true, data: canine };
+
+    // ERROR FIX: siblings ke 'never[]' hote deya jabe na
+    let siblings: any[] = [];
+
+    if (canine.litterId) {
+      siblings = await this.prisma.canine.findMany({
+        where: {
+          litterId: canine.litterId,
+          id: { not: id },
+        },
+        include: {
+          breedRelation: true,
+          images: { take: 1 },
+        },
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        ...canine,
+        siblings,
+      },
+    };
   }
 
   async updateCanine(id: string, dto: UpdateCanineAdminDto) {
