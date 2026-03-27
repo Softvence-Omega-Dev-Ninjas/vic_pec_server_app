@@ -24,12 +24,6 @@ enum HealthClearance {
 }
 
 
-enum RegistrationRequestType {
-  NEW_REGISTRATION
-  TIER_UPGRADE
-  DNA_RETEST
-}
-
 
 enum VerificationType {
   GOLD
