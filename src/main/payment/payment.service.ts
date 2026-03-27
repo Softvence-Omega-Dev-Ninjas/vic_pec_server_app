@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -16,7 +15,7 @@ import Stripe from 'stripe';
 import { PaginationDto, RevenueFilterDto } from './dto/PaginationDto';
 import {
   // CanineStatus,
-  ServiceType,
+  // ServiceType,
   SubscriptionStatus,
 } from 'generated/prisma/enums';
 
@@ -275,19 +274,29 @@ export class PaymentService {
     // 1. Daily Breakdown (Combining Subscription and Transaction tables)
     const dailyStats: any[] = await this.prisma.$queryRaw`
     WITH combined_payments AS (
-      SELECT "createdAt", "amountPaid" as amount, "userId", 'SUBSCRIPTION' as type
+      -- Subscriptions (Membership)
+      SELECT "createdAt", "amountPaid" as amount, "userId", 'MEMBERSHIP' as type
       FROM "subscriptions"
       WHERE "status" = 'active' AND "createdAt" >= ${startDate} AND "createdAt" < ${endDate}
       
       UNION ALL
       
-      SELECT "createdAt", "amount", "userId", 'SERVICE' as type
+      -- One-time Transactions (Services like Canine/Litter etc)
+      SELECT "createdAt", "amount", "userId", "serviceType"::text as type
       FROM "transactions"
       WHERE "status" = 'PAID' AND "createdAt" >= ${startDate} AND "createdAt" < ${endDate}
     )
     SELECT 
       TO_CHAR(day, 'DD Mon') as label,
-      COALESCE(SUM(cp.amount), 0)::FLOAT as revenue,
+      COALESCE(SUM(cp.amount), 0)::FLOAT as revenue, -- Total Revenue
+      
+      -- Specific Membership Revenue
+      COALESCE(SUM(CASE WHEN cp.type = 'MEMBERSHIP' THEN cp.amount ELSE 0 END), 0)::FLOAT as "membershipRevenue",
+      
+      -- Specific Service Revenue (Jodi Canine/Litter alada dorkar hoy)
+      COALESCE(SUM(CASE WHEN cp.type = 'CANINE_REG' THEN cp.amount ELSE 0 END), 0)::FLOAT as "canineregRevenue",
+      COALESCE(SUM(CASE WHEN cp.type = 'LITTER_REG' THEN cp.amount ELSE 0 END), 0)::FLOAT as "litterregRevenue",
+      
       COUNT(cp.amount)::INT as sales_count,
       COUNT(DISTINCT cp."userId")::INT as unique_customers
     FROM (
@@ -300,7 +309,7 @@ export class PaymentService {
     LEFT JOIN combined_payments cp ON DATE_TRUNC('day', cp."createdAt") = d.day 
     GROUP BY d.day
     ORDER BY d.day ASC
-  `;
+`;
 
     // 2. Fetch Summary from both tables
     const [subSummary, transSummary] = await Promise.all([
@@ -366,157 +375,145 @@ export class PaymentService {
     imageUrls: string[],
     docUrls: string[],
   ) {
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          membership: {
-            include: { servicePricings: true },
-          },
-        },
-      });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { membership: { include: { servicePricings: true } } },
+    });
 
-      // 1. Null Check (Error fix ekhane)
-      if (!user || !user.membership) {
-        throw new BadRequestException(
-          'User does not have an active membership plan.',
-        );
-      }
+    if (!user?.membership)
+      throw new BadRequestException('Active membership required');
 
-      // 2. Safe access (Ekhon ar error dibe na)
-      const canineService = user.membership.servicePricings.find(
-        (sp) => sp.serviceType === ServiceType.CANINE_REG,
-      );
+    const canineService = user.membership.servicePricings.find(
+      (sp) => sp.serviceType === 'CANINE_REG',
+    );
+    const finalPrice = Math.max(
+      0,
+      (canineService?.price || 0) - (user.membership.canineRegDiscount || 0),
+    );
 
-      const basePrice = canineService?.price || 0;
-      const discountAmount = user.membership.canineRegDiscount || 0;
-
-      const finalPrice = Math.max(0, basePrice - discountAmount);
-      const unitAmount = Math.round(finalPrice * 100);
-
-      // 3. Metadata te data gulo essential fields e simaboddho rakha (Limit check)
-      const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        client_reference_id: userId,
-        metadata: {
-          type: 'EXTRA_CANINE_REGISTRATION',
-          // Basic info gulo ekta key te
-          canineData: JSON.stringify({
-            name: canineDto.name,
-            breedId: canineDto.breedId,
-            gender: canineDto.gender,
-            dob: canineDto.dateOfBirth, // dateOfBirth ke dob kore length koman
-            color: canineDto.color,
-            weight: Number(canineDto.weight),
-            microchip: canineDto.microchipId,
-          }),
-          // Location/Address info gulo arekta key te (500 limit per key)
-          locationData: JSON.stringify({
-            city: canineDto.city,
-            state: canineDto.state,
-            country: canineDto.country,
-            zip: canineDto.zipCode,
-          }),
-          // Health/DNA info gulo arekta key te
-          healthData: JSON.stringify({
-            status: canineDto.healthStatus,
-            pDNA: canineDto.primaryBreedDNA,
-            sDNA: canineDto.secondaryBreedDNA,
-            vacs: canineDto.vaccinations || [],
-            clear: canineDto.healthClearances || [],
-          }),
-          imageUrls: JSON.stringify(imageUrls),
-          docUrls: JSON.stringify(docUrls),
-        },
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `Extra Canine Registration: ${canineDto.name}`,
-                description: `Breed registration for ${canineDto.name}`,
-              },
-              unit_amount: unitAmount,
+    const session = await this.stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      client_reference_id: userId,
+      metadata: {
+        type: 'EXTRA_CANINE_REGISTRATION',
+        canineData: JSON.stringify({
+          name: canineDto.name,
+          breedId: canineDto.breedId,
+          gender: canineDto.gender,
+          dob: canineDto.dateOfBirth,
+          color: canineDto.color,
+          weight: Number(canineDto.weight),
+          microchip: canineDto.microchipId,
+        }),
+        locationData: JSON.stringify({
+          city: canineDto.city,
+          state: canineDto.state,
+          country: canineDto.country,
+          zip: canineDto.zipCode,
+        }),
+        healthData: JSON.stringify({
+          status: canineDto.healthStatus,
+          pDNA: canineDto.primaryBreedDNA,
+          sDNA: canineDto.secondaryBreedDNA,
+          vacs: canineDto.vaccinations || [],
+          clear: canineDto.healthClearances || [],
+        }),
+        imageUrls: JSON.stringify(imageUrls),
+        docUrls: JSON.stringify(docUrls),
+      },
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Extra Canine Registration: ${canineDto.name}`,
             },
-            quantity: 1,
+            unit_amount: Math.round(finalPrice * 100),
           },
-        ],
-        mode: 'payment',
-        success_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=true`,
-        cancel_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=false`,
-      });
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL}/owner/dashboard?success=true`,
+      cancel_url: `${process.env.FRONTEND_URL}/owner/dashboard?success=false`,
+    });
 
-      return { url: session.url };
-    } catch (error: any) {
-      this.logger.error(`Session Creation Error: ${error.message}`);
-      if (error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException(error.message);
-    }
+    return { url: session.url };
   }
 
   async createLitterSession(
     userId: string,
-    litterDto: any,
-    imageUrls: any[],
-    docUrls: any[],
+    dto: any,
+    generation: string,
+    imageUrls: string[],
+    docUrls: string[],
   ) {
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          membership: {
-            include: {
-              servicePricings: {
-                where: { serviceType: 'LITTER_REG' },
-              },
-            },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { membership: { include: { servicePricings: true } } },
+    });
+
+    const pricing = user?.membership?.servicePricings.find(
+      (sp) => sp.serviceType === 'LITTER_REG',
+    );
+
+    const basePrice = pricing?.price || 0;
+    const discount = user?.membership?.litterRegDiscount || 0;
+    const finalPrice = Math.max(0, basePrice * (1 - discount));
+    const unitAmount = Math.round(finalPrice * 100);
+
+    const session = await this.stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      client_reference_id: userId,
+      metadata: {
+        type: 'LITTER_REGISTRATION',
+        // Basic info minified
+        b: JSON.stringify({
+          n: dto.litterName,
+          bid: dto.breedId,
+          dob: dto.dateOfBirth,
+          mid: dto.motherPcrId,
+          fid: dto.fatherPcrId,
+          gen: generation,
+        }),
+        // Location info minified
+        l: JSON.stringify({
+          c: dto.city,
+          s: dto.state,
+          z: dto.zipCode,
+          co: dto.country,
+        }),
+        // Puppies array minified (n=name, g=gender, c=color, w=weight, m=microchip)
+        p: JSON.stringify(
+          dto.puppies?.map((pup: any) => ({
+            n: pup.name,
+            g: pup.gender,
+            c: pup.color,
+            w: pup.weight,
+            m: pup.microchipId,
+            hs: pup.healthStatus || 'EXCELLENT', // hs = healthStatus
+            v: pup.vaccinations || [], // v = vaccinations
+            hc: pup.healthClearances || [],
+          })),
+        ),
+        imgs: JSON.stringify(imageUrls),
+        docs: JSON.stringify(docUrls),
+      },
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: { name: `Litter Registration: ${dto.litterName}` },
+            unit_amount: unitAmount,
           },
+          quantity: 1,
         },
-      });
+      ],
+      mode: 'payment',
+      success_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=true`,
+      cancel_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=false`,
+    });
 
-      if (!user || !user.membership) {
-        throw new BadRequestException(
-          'Active membership required for litter registration.',
-        );
-      }
-
-      const servicePricing = user.membership.servicePricings[0];
-      const basePrice = servicePricing?.price || 50; // Default $50 jodi DB te na thake
-      const discount = user.membership.litterRegDiscount || 0;
-
-      const finalAmount = Math.round(basePrice * (1 - discount) * 100);
-
-      const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `Litter Registration - ${litterDto.generation} Generation`,
-                description: `Plan: ${user.membership.name} (${(discount * 100).toFixed(0)}% Discount Applied)`,
-              },
-              unit_amount: finalAmount,
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'payment',
-        success_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=true&type=litter`,
-        cancel_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=false&type=litter`,
-        client_reference_id: userId,
-        metadata: {
-          type: 'LITTER_REGISTRATION',
-          amountPaid: (finalAmount / 100).toString(),
-          litterData: JSON.stringify(litterDto),
-          imageUrls: JSON.stringify(imageUrls),
-          docUrls: JSON.stringify(docUrls),
-        },
-      });
-
-      return { url: session.url };
-    } catch (error: any) {
-      throw new InternalServerErrorException(`Stripe Error: ${error.message}`);
-    }
+    return { url: session.url };
   }
 }

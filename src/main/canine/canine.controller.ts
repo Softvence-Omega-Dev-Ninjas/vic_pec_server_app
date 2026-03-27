@@ -41,7 +41,7 @@ export class CanineController {
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'images', maxCount: 5 },
-      { name: 'docs', maxCount: 2 },
+      { name: 'DNAdocuments', maxCount: 2 }, // Ekhane 'docs' chhilo, eta change hobe
     ]),
   )
   @ApiOperation({ summary: 'Register a new canine' })
@@ -49,13 +49,16 @@ export class CanineController {
     @Req() req: any,
     @Body() dto: RegisterCanineDto,
     @UploadedFiles()
-    files: { images?: Express.Multer.File[]; docs?: Express.Multer.File[] },
+    files: {
+      images?: Express.Multer.File[];
+      DNAdocuments?: Express.Multer.File[];
+    },
   ) {
     return await this.canineService.registerCanine(
       req.userId,
       dto,
       files.images || [],
-      files.docs || [],
+      files.DNAdocuments || [],
     );
   }
 

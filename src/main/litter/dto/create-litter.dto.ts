@@ -7,17 +7,20 @@ import {
   IsEnum,
   IsNumber,
   IsArray,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import {
+  CanineStatus,
   Gender,
   HealthClearance,
-  RegistrationRequestType,
+  RegistryTier,
   VaccinationType,
 } from 'generated/prisma/enums';
 import { PartialType } from '@nestjs/swagger';
 
-export class CreateLitterDto {
-  @ApiProperty({ example: 'Litter 01 - Golden Retriever' })
+export class PuppyDetailDto {
+  @ApiProperty({ example: 'Puppy Alpha' })
   @IsString()
   @IsNotEmpty()
   name!: string;
@@ -26,35 +29,37 @@ export class CreateLitterDto {
   @IsEnum(Gender)
   gender!: Gender;
 
+  @ApiProperty({ example: 'Golden Brown' })
+  @IsString()
+  @IsNotEmpty()
+  color!: string;
+
+  @ApiProperty({ example: 4.5 })
+  @IsNumber()
+  @IsNotEmpty()
+  weight!: number;
+
+  @ApiPropertyOptional({ example: 'MC-999000111' })
+  @IsOptional()
+  @IsString()
+  microchipId?: string;
+}
+
+export class CreateLitterDto {
+  @ApiProperty({ example: 'Golden Winter 2024' })
+  @IsString()
+  @IsNotEmpty()
+  litterName!: string;
+
   @ApiProperty({ example: '2024-03-08' })
   @IsDateString()
   @IsNotEmpty()
   dateOfBirth!: string;
 
-  @ApiProperty({ example: 'Creamy White' })
-  @IsString()
-  @IsNotEmpty()
-  color!: string;
-
-  @ApiProperty({ example: 12.5 })
-  @IsNumber()
-  @IsNotEmpty()
-  weight!: number;
-
   @ApiProperty({ example: 'breed-uuid-here' })
   @IsString()
   @IsNotEmpty()
   breedId!: string;
-
-  @ApiProperty({ example: 'F1', description: 'Required for Designer breeds' })
-  @IsString()
-  @IsNotEmpty()
-  generation!: string;
-
-  @ApiProperty({ example: 'MC-123456789' })
-  @IsString()
-  @IsNotEmpty()
-  microchipId!: string;
 
   @ApiPropertyOptional({ example: 'PCR-G301-00001-123456' })
   @IsOptional()
@@ -66,12 +71,17 @@ export class CreateLitterDto {
   @IsString()
   fatherPcrId?: string;
 
-  // New Health Related Fields
-  @ApiPropertyOptional({ example: 'Excellent' })
-  @IsOptional()
-  @IsString()
-  healthStatus?: string;
+  // Multi-Puppy Support
+  @ApiProperty({
+    type: [PuppyDetailDto],
+    description: 'List of all puppies in this litter',
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PuppyDetailDto)
+  puppies!: PuppyDetailDto[];
 
+  // Common Health (Litter level)
   @ApiPropertyOptional({ enum: VaccinationType, isArray: true })
   @IsOptional()
   @IsArray()
@@ -84,31 +94,43 @@ export class CreateLitterDto {
   @IsEnum(HealthClearance, { each: true })
   healthClearances?: HealthClearance[];
 
-  @ApiPropertyOptional({ example: 'Any additional health information...' })
+  @ApiPropertyOptional({ example: 'Litter health notes...' })
   @IsOptional()
   @IsString()
   healthNotes?: string;
 
-  // Location data
+  // Common Location
   @ApiProperty({ example: 'Dallas' }) @IsString() @IsNotEmpty() city!: string;
   @ApiProperty({ example: 'TX' }) @IsString() @IsNotEmpty() state!: string;
   @ApiProperty({ example: '75201' }) @IsString() @IsNotEmpty() zipCode!: string;
   @ApiProperty({ example: 'USA' }) @IsString() @IsNotEmpty() country!: string;
 
-  // @ApiProperty({ example: 'German Shepherd' })
-  // @IsNotEmpty()
-  // @IsString()
-  // primaryBreedDNA!: string;
-
-  // @ApiPropertyOptional({ example: 'Husky' })
-  // @IsOptional()
-  // @IsString()
-  // secondaryBreedDNA?: string;
-
-  @ApiPropertyOptional({ enum: RegistrationRequestType })
+  // Media (Swagger UI Support)
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'string', format: 'binary' },
+    description: 'Litter Group Photos',
+  })
   @IsOptional()
-  @IsEnum(RegistrationRequestType)
-  requestType?: RegistrationRequestType;
+  images?: any[];
+
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'string', format: 'binary' },
+    description: 'DNA/Pedigree Docs',
+  })
+  @IsOptional()
+  DNAdocuments?: any[];
 }
 
-export class UpdateLitterDto extends PartialType(CreateLitterDto) {}
+export class UpdateLitterDto extends PartialType(CreateLitterDto) {
+  @ApiPropertyOptional({ enum: CanineStatus })
+  @IsOptional()
+  @IsEnum(CanineStatus)
+  status?: CanineStatus;
+
+  @ApiPropertyOptional({ enum: RegistryTier })
+  @IsOptional()
+  @IsEnum(RegistryTier)
+  tier?: RegistryTier;
+}
