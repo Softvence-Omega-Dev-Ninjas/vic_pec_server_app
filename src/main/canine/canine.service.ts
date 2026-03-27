@@ -17,6 +17,7 @@ import { RegisterCanineDto, UpdateCanineDto } from './dto/create-canine.dto';
 import { CanineQueryDto } from './dto/canine-query.dto';
 import { RegistryTier, ResourceType } from 'generated/prisma/enums';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class CanineService {
@@ -26,6 +27,7 @@ export class CanineService {
     private prisma: PrismaService,
     private cloudinary: CloudinaryService,
     private notificationsService: NotificationsService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   // 1. Register Canine
@@ -39,6 +41,29 @@ export class CanineService {
       const breed = await this.prisma.breed.findUnique({
         where: { id: dto.breedId },
       });
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { membership: true, _count: { select: { canines: true } } },
+      });
+      if (!user) {
+        throw Error('User not found!');
+      }
+      const limit = user?.membership?.canineLimit || 0;
+
+      if (user._count.canines >= limit) {
+        const [imageUrlList, docUrlList] = await Promise.all([
+          this.cloudinary.uploadImages(images),
+          this.cloudinary.uploadImages(docs),
+        ]);
+
+        return await this.paymentService.createExtraCanineSession(
+          userId,
+          dto,
+          imageUrlList as string[],
+          docUrlList as string[],
+        );
+      }
 
       if (!breed) {
         throw new NotFoundException(`Breed with ID ${dto.breedId} not found`);

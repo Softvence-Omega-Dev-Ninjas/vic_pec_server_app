@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -14,7 +15,7 @@ import {
   CreateMembershipDto,
   UpdateMembershipDto,
 } from './dto/create-membership-plan.dto';
-import { SubscriptionStatus } from 'generated/prisma/enums';
+import { ServiceType, SubscriptionStatus } from 'generated/prisma/enums';
 
 @Injectable()
 export class MembershipPlanService {
@@ -31,20 +32,46 @@ export class MembershipPlanService {
           `Maximum limit of ${this.MAX_PLANS} membership plans reached.`,
         );
       }
+
       const existing = await this.prisma.membership.findUnique({
         where: { tier: dto.tier },
       });
       if (existing)
         throw new ConflictException('This membership tier already exists.');
 
-      return await this.prisma.membership.create({
-        data: {
-          tier: dto.tier,
-          name: dto.name,
-          currentPrice: dto.currentPrice,
-          canineLimit: dto.canineLimit,
-          features: dto.features,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Create Membership with Discounts
+        const membership = await tx.membership.create({
+          data: {
+            tier: dto.tier,
+            name: dto.name,
+            currentPrice: dto.currentPrice,
+            canineLimit: dto.canineLimit,
+            features: dto.features,
+            canineRegDiscount: dto.canineRegDiscount,
+            litterRegDiscount: dto.litterRegDiscount,
+            transferDiscount: dto.transferDiscount,
+            certificateDiscount: dto.certificateDiscount,
+          },
+        });
+
+        // 2. Create Service Specific Base Prices
+        const pricingData = [
+          { serviceType: ServiceType.CANINE_REG, price: dto.canineRegPrice },
+          { serviceType: ServiceType.LITTER_REG, price: dto.litterRegPrice },
+          { serviceType: ServiceType.TRANSFER, price: dto.transferPrice },
+          { serviceType: ServiceType.CERTIFICATE, price: dto.certificatePrice },
+        ];
+
+        await tx.servicePricing.createMany({
+          data: pricingData.map((p) => ({
+            membershipId: membership.id,
+            serviceType: p.serviceType,
+            price: p.price,
+          })),
+        });
+
+        return membership;
       });
     } catch (error: any) {
       this.logger.error(`Plan Creation Failed: ${error.message}`);
@@ -62,6 +89,7 @@ export class MembershipPlanService {
   async getAllPlans() {
     try {
       return await this.prisma.membership.findMany({
+        include: { servicePricings: true },
         orderBy: { currentPrice: 'asc' },
       });
     } catch (error) {
@@ -78,9 +106,51 @@ export class MembershipPlanService {
       const plan = await this.prisma.membership.findUnique({ where: { id } });
       if (!plan) throw new NotFoundException('Membership plan not found');
 
-      return await this.prisma.membership.update({
-        where: { id },
-        data: dto,
+      return await this.prisma.$transaction(async (tx) => {
+        // 1. Update Membership table fields
+        const updatedMembership = await tx.membership.update({
+          where: { id },
+          data: {
+            name: dto.name,
+            currentPrice: dto.currentPrice,
+            canineLimit: dto.canineLimit,
+            features: dto.features,
+            canineRegDiscount: dto.canineRegDiscount,
+            litterRegDiscount: dto.litterRegDiscount,
+            transferDiscount: dto.transferDiscount,
+            certificateDiscount: dto.certificateDiscount,
+          },
+        });
+
+        // 2. Map service pricing fields to loop for cleaner code
+        const servicePriceMap = [
+          { type: ServiceType.CANINE_REG, price: dto.canineRegPrice },
+          { type: ServiceType.LITTER_REG, price: dto.litterRegPrice },
+          { type: ServiceType.TRANSFER, price: dto.transferPrice },
+          { type: ServiceType.CERTIFICATE, price: dto.certificatePrice },
+        ];
+
+        // 3. Upsert ServicePricing for each service
+        for (const service of servicePriceMap) {
+          if (service.price !== undefined) {
+            await tx.servicePricing.upsert({
+              where: {
+                serviceType_membershipId: {
+                  serviceType: service.type,
+                  membershipId: id,
+                },
+              },
+              update: { price: service.price },
+              create: {
+                serviceType: service.type,
+                membershipId: id,
+                price: service.price,
+              },
+            });
+          }
+        }
+
+        return updatedMembership;
       });
     } catch (error: any) {
       this.logger.error(`Update Failed: ${error.message}`);

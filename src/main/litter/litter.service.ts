@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
@@ -17,6 +18,7 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { LitterQueryDto } from './dto/LitterQueryDto';
 import { RegistryTier, ResourceType } from 'generated/prisma/enums';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { PaymentService } from '../payment/payment.service';
 
 @Injectable()
 export class LitterService {
@@ -26,6 +28,7 @@ export class LitterService {
     private prisma: PrismaService,
     private cloudinary: CloudinaryService,
     private notificationsService: NotificationsService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   async createLitter(
@@ -35,147 +38,95 @@ export class LitterService {
     docs: Express.Multer.File[],
   ) {
     try {
+      // 1. Breed Fetch and Basic Validation
       const breed = await this.prisma.breed.findUnique({
         where: { id: dto.breedId },
       });
-
       if (!breed) throw new NotFoundException('Selected breed not found');
 
-      const pcrBreedCode = breed.breedCode;
+      // 2. Parent and Generation Validation
+      if (dto.motherPcrId || dto.fatherPcrId) {
+        const parentPcrIds = [dto.motherPcrId, dto.fatherPcrId].filter(
+          Boolean,
+        ) as string[];
 
-      if (breed.type === 'DESIGNER' && dto.generation !== 'F1') {
-        const parentPcrIds = [dto.motherPcrId, dto.fatherPcrId].filter(Boolean);
-
-        const f1Ancestor = await this.prisma.canine.findFirst({
-          where: {
-            pcrId: { in: parentPcrIds as any },
-            generation: 'F1',
-          },
+        const parents = await this.prisma.canine.findMany({
+          where: { pcrId: { in: parentPcrIds } },
+          select: { pcrId: true, gender: true, generation: true },
         });
 
-        if (dto.motherPcrId || dto.fatherPcrId) {
-          const parentPcrIds = [dto.motherPcrId, dto.fatherPcrId].filter(
-            Boolean,
-          ) as string[];
-
-          const parents = await this.prisma.canine.findMany({
-            where: { pcrId: { in: parentPcrIds } },
-            select: { pcrId: true, gender: true },
-          });
-
-          parents.forEach((parent) => {
-            if (
-              parent.pcrId === dto.motherPcrId &&
-              parent.gender !== 'FEMALE'
-            ) {
-              throw new BadRequestException(
-                `Canine ${parent.pcrId} is not a Female and cannot be a mother`,
-              );
-            }
-            if (parent.pcrId === dto.fatherPcrId && parent.gender !== 'MALE') {
-              throw new BadRequestException(
-                `Canine ${parent.pcrId} is not a Male and cannot be a father`,
-              );
-            }
-          });
-
-          // 3. Designer breed ancestor check (F1 validation)
-          if (breed.type === 'DESIGNER' && dto.generation !== 'F1') {
-            const f1Ancestor = await this.prisma.canine.findFirst({
-              where: {
-                pcrId: { in: parentPcrIds },
-                generation: 'F1',
-              },
-            });
-
-            if (!f1Ancestor && parentPcrIds.length > 0) {
-              throw new BadRequestException(
-                'Registration rejected: Later generations must trace back to a registered F1 ancestor',
-              );
-            }
+        parents.forEach((parent) => {
+          if (parent.pcrId === dto.motherPcrId && parent.gender !== 'FEMALE') {
+            throw new BadRequestException(
+              `Canine ${parent.pcrId} is not a Female and cannot be a mother`,
+            );
           }
-        }
+          if (parent.pcrId === dto.fatherPcrId && parent.gender !== 'MALE') {
+            throw new BadRequestException(
+              `Canine ${parent.pcrId} is not a Male and cannot be a father`,
+            );
+          }
+        });
 
-        if (!f1Ancestor && parentPcrIds.length > 0) {
-          throw new BadRequestException(
-            'Registration rejected: Any later generations (F1B, F2, VD) must trace back to a registered F1 ancestor',
-          );
+        // Designer breed F1 ancestor check
+        if (breed.type === 'DESIGNER' && dto.generation !== 'F1') {
+          const hasF1Ancestor = parents.some((p) => p.generation === 'F1');
+          if (!hasF1Ancestor) {
+            throw new BadRequestException(
+              'Registration rejected: Later generations must trace back to a registered F1 ancestor',
+            );
+          }
         }
       }
 
-      // ৩. PCR ID Generation (Prefix 'L' for Litter)
-      const lastLitter = await this.prisma.litter.findFirst({
-        where: { pcrBreedCode, generation: dto.generation },
-        orderBy: { pcrIncremental: 'desc' },
+      // 3. User Membership and Pricing Logic
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          membership: {
+            include: {
+              servicePricings: { where: { serviceType: 'LITTER_REG' } },
+            },
+          },
+        },
       });
 
-      const nextInc = lastLitter ? parseInt(lastLitter.pcrIncremental) + 1 : 1;
-      const pcrIncremental = nextInc.toString().padStart(5, '0');
-      const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
+      if (!user || !user.membership)
+        throw new BadRequestException('Active membership required');
 
-      // Format: PCR-L301-F1B-00001-123456
-      const pcrId = `PCR-L${pcrBreedCode}-${dto.generation}-${pcrIncremental}-${pcrRandom}`;
+      const servicePricing = user.membership.servicePricings[0];
+      const basePrice = servicePricing?.price || 0;
+      const discount = user.membership.litterRegDiscount || 0;
+      const finalAmount = Math.round(basePrice * (1 - discount) * 100);
 
-      const tier =
-        breed.type === 'DESIGNER' ? RegistryTier.GOLD : RegistryTier.BLUE;
-
+      // 4. Image/Doc Upload (Transaction er agei upload kora bhalo)
       const [imageUrlList, docUrlList] = await Promise.all([
         this.cloudinary.uploadImages(images),
         this.cloudinary.uploadImages(docs),
       ]);
 
-      const newLitter = await this.prisma.$transaction(async (tx) => {
-        if (dto.microchipId) {
-          const existing = await tx.litter.findUnique({
-            where: { microchipId: dto.microchipId },
-          });
-          if (existing)
-            throw new ConflictException('Microchip ID already exists');
-        }
-
-        return await tx.litter.create({
-          data: {
-            ...dto,
-            pcrId,
-            pcrPrefix: 'L',
-            pcrBreedCode,
-            pcrIncremental,
-            pcrRandom,
-            tier,
-            dateOfBirth: new Date(dto.dateOfBirth),
-            ownerId: userId,
-            images: {
-              create: (imageUrlList as any)
-                .filter((img: any) => img?.url && img?.publicId)
-                .map((img: any) => ({
-                  url: img.url,
-                  publicId: img.publicId,
-                })),
-            },
-
-            DNAdocuments: {
-              create: docUrlList.map((doc: any) => ({
-                url: doc.url,
-                publicId: doc.publicId,
-              })),
-            },
-          },
-          include: {
-            images: true,
-            DNAdocuments: true,
-            mother: true,
-            father: true,
-          },
+      // 5. Execution Logic: Free vs Paid
+      if (finalAmount <= 0) {
+        // FREE REGISTRATION: Direct Database Creation
+        return await this.prisma.$transaction(async (tx) => {
+          return await this.executeLitterCreation(
+            tx,
+            userId,
+            dto,
+            imageUrlList,
+            docUrlList,
+            breed,
+          );
         });
-      });
+      }
 
-      await this.notificationsService.alertAdmins({
-        title: 'Litter Registration',
-        message: `A new litter has been registered in the system.`,
-        category: ResourceType.CANINE,
-        link: `/admin/litters/${newLitter.id}`,
-        sourceId: newLitter.id,
-      });
+      // PAID REGISTRATION: Stripe Checkout Session
+      return await this.paymentService.createLitterSession(
+        userId,
+        dto,
+        imageUrlList,
+        docUrlList,
+      );
     } catch (error: any) {
       this.logger.error(`Litter creation failed: ${error.message}`);
       if (
@@ -189,6 +140,81 @@ export class LitterService {
         error.message || 'Error occurred while creating litter',
       );
     }
+  }
+
+  async executeLitterCreation(
+    tx: any,
+    userId: string,
+    dto: CreateLitterDto,
+    imageUrlList: any[],
+    docUrlList: any[],
+    breed: any,
+  ) {
+    const pcrBreedCode = breed.breedCode;
+
+    // PCR ID Generation
+    const lastLitter = await tx.litter.findFirst({
+      where: { pcrBreedCode, generation: dto.generation },
+      orderBy: { pcrIncremental: 'desc' },
+    });
+
+    const nextInc = lastLitter ? parseInt(lastLitter.pcrIncremental) + 1 : 1;
+    const pcrIncremental = nextInc.toString().padStart(5, '0');
+    const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
+    const pcrId = `PCR-L${pcrBreedCode}-${dto.generation}-${pcrIncremental}-${pcrRandom}`;
+    const tier =
+      breed.type === 'DESIGNER' ? RegistryTier.GOLD : RegistryTier.BLUE;
+
+    if (dto.microchipId) {
+      const existing = await tx.litter.findUnique({
+        where: { microchipId: dto.microchipId },
+      });
+      if (existing) throw new ConflictException('Microchip ID already exists');
+    }
+
+    const newLitter = await tx.litter.create({
+      data: {
+        ...dto,
+        pcrId,
+        pcrPrefix: 'L',
+        pcrBreedCode,
+        pcrIncremental,
+        pcrRandom,
+        tier,
+        dateOfBirth: new Date(dto.dateOfBirth),
+        ownerId: userId,
+        images: {
+          create: (imageUrlList as any)
+            .filter((img: any) => img?.url && img?.publicId)
+            .map((img: any) => ({
+              url: img.url,
+              publicId: img.publicId,
+            })),
+        },
+        DNAdocuments: {
+          create: docUrlList.map((doc: any) => ({
+            url: doc.url,
+            publicId: doc.publicId,
+          })),
+        },
+      },
+      include: {
+        images: true,
+        DNAdocuments: true,
+        mother: true,
+        father: true,
+      },
+    });
+
+    await this.notificationsService.alertAdmins({
+      title: 'Litter Registration',
+      message: `A new litter ${pcrId} has been registered.`,
+      category: ResourceType.CANINE,
+      link: `/admin/litters/${newLitter.id}`,
+      sourceId: newLitter.id,
+    });
+
+    return newLitter;
   }
 
   async findAll(query: LitterQueryDto) {
