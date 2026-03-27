@@ -45,13 +45,7 @@ export class RegisterCanineDto {
   @IsNotEmpty()
   breedId!: string;
 
-  @ApiPropertyOptional({
-    example: 'F1',
-    description: 'Required if breed type is DESIGNER. Options: F1, F1B, F2, VD',
-  })
-  @IsOptional()
-  @IsString()
-  generation?: string;
+  // Generation removed as per instruction for individual registration
 
   @ApiProperty({ example: '900123456789' })
   @IsString()
@@ -68,7 +62,6 @@ export class RegisterCanineDto {
   @IsString()
   secondaryBreedDNA?: string;
 
-  // New Health Related Fields
   @ApiPropertyOptional({ example: 'Excellent' })
   @IsOptional()
   @IsString()
@@ -91,7 +84,6 @@ export class RegisterCanineDto {
   @IsString()
   healthNotes?: string;
 
-  // Location fields
   @ApiProperty({ example: 'Dallas' }) @IsString() @IsNotEmpty() city!: string;
   @ApiProperty({ example: 'TX' }) @IsString() @IsNotEmpty() state!: string;
   @ApiProperty({ example: '75201' }) @IsString() @IsNotEmpty() zipCode!: string;
@@ -102,15 +94,18 @@ export class RegisterCanineDto {
   @IsEnum(RegistrationRequestType)
   requestType?: RegistrationRequestType;
 
-  // For handling multiple images/files in the service
-  @ApiPropertyOptional({ type: 'string', format: 'binary', isArray: true })
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'string', format: 'binary' },
+  })
   @IsOptional()
-  @IsArray()
   images?: any[];
 
-  @ApiPropertyOptional({ type: 'string', format: 'binary', isArray: true })
+  @ApiPropertyOptional({
+    type: 'array',
+    items: { type: 'string', format: 'binary' },
+  })
   @IsOptional()
-  @IsArray()
   DNAdocuments?: any[];
 }
 
