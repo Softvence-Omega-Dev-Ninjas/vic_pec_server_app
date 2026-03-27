@@ -28,6 +28,8 @@ model Document {
   publicId  String
   isPrimary Boolean  @default(false)
 
+  name      String?
+
   litterId  String?
   litter    Litter?  @relation("LitterDocuments", fields: [litterId], references: [id])
 

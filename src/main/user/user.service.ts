@@ -246,10 +246,21 @@ export class UserService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
-        membership: true,
+        membership: {
+          include: {
+            servicePricings: true, // Admin set kora price gulo pabe
+          },
+        },
         profileImage: true,
         coverImage: true,
         permissions: true,
+        // User koita canine/litter create korche tar count
+        _count: {
+          select: {
+            canines: true,
+            ownedLitters: true,
+          },
+        },
       },
     });
 
