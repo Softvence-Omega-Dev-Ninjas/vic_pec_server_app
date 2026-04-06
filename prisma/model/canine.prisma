@@ -72,3 +72,14 @@ enum RegistryTier {
   GOLD
   BLUE
 }
+
+model PcrSequence {
+  id        String   @id @default(uuid())
+  kind      String   // 'CANINE' or 'LITTER' 
+  prefix    String   // 'G', 'B', 'L'
+  breedCode String   // '301', '119'
+  lastValue Int      @default(0)
+
+  @@unique([kind, prefix, breedCode])
+  @@map("pcr_sequences")
+}

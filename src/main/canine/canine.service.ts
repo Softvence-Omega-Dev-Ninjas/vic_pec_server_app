@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -29,7 +28,18 @@ export class CanineService {
     private cloudinary: CloudinaryService,
     private notificationsService: NotificationsService,
     private readonly paymentService: PaymentService,
-  ) {}
+  ) { }
+
+  private async getNextPcrId(kind: string, prefix: string, breedCode: string): Promise<string> {
+    const sequence = await this.prisma.pcrSequence.upsert({
+      where: {
+        kind_prefix_breedCode: { kind, prefix, breedCode },
+      },
+      update: { lastValue: { increment: 1 } },
+      create: { kind, prefix, breedCode, lastValue: 1 },
+    });
+    return sequence.lastValue.toString().padStart(5, '0');
+  }
 
   // 1. Register Canine
   async registerCanine(
@@ -68,17 +78,40 @@ export class CanineService {
       );
     }
 
-    // PCR ID Logic (No Generation for Individual Reg)
-    const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
-    const lastCanine = await this.prisma.canine.findFirst({
-      where: { pcrPrefix, pcrBreedCode: breed.breedCode },
-      orderBy: { pcrIncremental: 'desc' },
-    });
+    const isDesigner = breed.type === 'DESIGNER';
+    
+    // DNA Validation
+    if (dto.primaryBreedDNA) {
+      const primaryPercentage = parseFloat(String(dto.primaryBreedDNA).replace(/[^0-9.]/g, ''));
+      if (isNaN(primaryPercentage)) {
+        throw new BadRequestException('Primary Breed DNA must contain a valid numerical percentage.');
+      }
+      
+      if (!isDesigner) {
+        if (primaryPercentage < 90) {
+          throw new BadRequestException('Purebred registration requires >=90% primary breed DNA.');
+        }
+      } else {
+        const secondaryPercentage = parseFloat(String(dto.secondaryBreedDNA || '0').replace(/[^0-9.]/g, ''));
+        if (isNaN(secondaryPercentage)) {
+          throw new BadRequestException('Secondary Breed DNA must contain a valid numerical percentage for designers.');
+        }
+        if (primaryPercentage < 40 || primaryPercentage > 60 || secondaryPercentage < 40 || secondaryPercentage > 60) {
+          throw new BadRequestException('F1 Designer registration requires a 40%-60% distribution between two breeds.');
+        }
+        if (primaryPercentage + secondaryPercentage < 90) {
+          throw new BadRequestException('Combined primary and secondary DNA must be >= 90% for F1 Designers.');
+        }
+      }
+    }
 
-    const nextInc = lastCanine ? parseInt(lastCanine.pcrIncremental) + 1 : 1;
-    const pcrIncremental = nextInc.toString().padStart(5, '0');
+    const pcrPrefix = isDesigner ? 'B' : 'G';
+    const generation = isDesigner ? 'F1' : null;
+    const genPart = generation ? `-${generation}` : '';
+
+    const pcrIncremental = await this.getNextPcrId('CANINE', pcrPrefix, breed.breedCode);
     const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
-    const pcrId = `PCR-${pcrPrefix}${breed.breedCode}-${pcrIncremental}-${pcrRandom}`;
+    const pcrId = `PCR-${pcrPrefix}${breed.breedCode}${genPart}-${pcrIncremental}-${pcrRandom}`;
 
     return await this.prisma.$transaction(async (tx) => {
       const existing = await tx.canine.findUnique({
@@ -89,13 +122,13 @@ export class CanineService {
       const canine = await tx.canine.create({
         data: {
           ...dto,
-          generation: null, // Strictly null for main registration
+          generation, // Automatically F1 for Designers, null for Purebreds
           pcrId,
           pcrPrefix,
           pcrBreedCode: breed.breedCode,
           pcrIncremental,
           pcrRandom,
-          tier: pcrPrefix === 'G' ? 'GOLD' : 'BLUE',
+          tier: isDesigner ? 'BLUE' : 'GOLD',
           ownerId: userId,
           dateOfBirth: new Date(dto.dateOfBirth),
           images: {
@@ -152,12 +185,12 @@ export class CanineService {
           // Global Search
           search
             ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { pcrId: { contains: search, mode: 'insensitive' } },
-                  { microchipId: { contains: search, mode: 'insensitive' } },
-                ],
-              }
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { pcrId: { contains: search, mode: 'insensitive' } },
+                { microchipId: { contains: search, mode: 'insensitive' } },
+              ],
+            }
             : {},
           // Specific Filters
           breedId ? { breedId } : {},
@@ -168,10 +201,10 @@ export class CanineService {
           // Nested Breed Name Filter
           breedName
             ? {
-                breedRelation: {
-                  name: { contains: breedName, mode: 'insensitive' },
-                },
-              }
+              breedRelation: {
+                name: { contains: breedName, mode: 'insensitive' },
+              },
+            }
             : {},
         ],
       };
@@ -413,12 +446,12 @@ export class CanineService {
           { ownerId }, // Force filter by logged-in user
           search
             ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { pcrId: { contains: search, mode: 'insensitive' } },
-                  { microchipId: { contains: search, mode: 'insensitive' } },
-                ],
-              }
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { pcrId: { contains: search, mode: 'insensitive' } },
+                { microchipId: { contains: search, mode: 'insensitive' } },
+              ],
+            }
             : {},
           breedId ? { breedId } : {},
           gender ? { gender } : {},
@@ -427,10 +460,10 @@ export class CanineService {
           color ? { color: { contains: color, mode: 'insensitive' } } : {},
           breedName
             ? {
-                breedRelation: {
-                  name: { contains: breedName, mode: 'insensitive' },
-                },
-              }
+              breedRelation: {
+                name: { contains: breedName, mode: 'insensitive' },
+              },
+            }
             : {},
         ],
       };
@@ -548,12 +581,12 @@ export class CanineService {
           { status }, // Validated status
           search
             ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { pcrId: { contains: search, mode: 'insensitive' } },
-                  { microchipId: { contains: search, mode: 'insensitive' } },
-                ],
-              }
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { pcrId: { contains: search, mode: 'insensitive' } },
+                { microchipId: { contains: search, mode: 'insensitive' } },
+              ],
+            }
             : {},
           breedId ? { breedId } : {},
           gender ? { gender } : {},

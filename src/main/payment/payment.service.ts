@@ -444,7 +444,7 @@ export class PaymentService {
   async createLitterSession(
     userId: string,
     dto: any,
-    generation: string,
+    generation: string | null,
     imageUrls: string[],
     docUrls: string[],
   ) {

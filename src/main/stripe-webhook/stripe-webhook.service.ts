@@ -167,7 +167,11 @@ export class StripeWebhookService {
       const breed = await tx.breed.findUnique({ where: { id: basic.breedId } });
       if (!breed) throw new Error('Breed not found');
 
-      const pcrPrefix = breed.type === 'DESIGNER' ? 'G' : 'B';
+      const isDesigner = breed.type === 'DESIGNER';
+      const pcrPrefix = isDesigner ? 'B' : 'G';
+      const generation = isDesigner ? 'F1' : null;
+      const genPart = generation ? `-${generation}` : '';
+
       const lastCanine = await tx.canine.findFirst({
         where: { pcrPrefix, pcrBreedCode: breed.breedCode },
         orderBy: { pcrIncremental: 'desc' },
@@ -176,7 +180,7 @@ export class StripeWebhookService {
       const nextInc = lastCanine ? parseInt(lastCanine.pcrIncremental) + 1 : 1;
       const pcrIncremental = nextInc.toString().padStart(5, '0');
       const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
-      const pcrId = `PCR-${pcrPrefix}${breed.breedCode}-${pcrIncremental}-${pcrRandom}`;
+      const pcrId = `PCR-${pcrPrefix}${breed.breedCode}${genPart}-${pcrIncremental}-${pcrRandom}`;
 
       const newCanine = await tx.canine.create({
         data: {
@@ -190,7 +194,7 @@ export class StripeWebhookService {
           state: location.state,
           country: location.country,
           zipCode: location.zip,
-          generation: null, // Strictly null
+          generation, // null for purebred, F1 for designer
           pcrId,
           pcrPrefix,
           pcrBreedCode: breed.breedCode,
@@ -198,7 +202,7 @@ export class StripeWebhookService {
           pcrRandom,
           ownerId: userId,
           breedId: breed.id,
-          tier: pcrPrefix === 'G' ? 'GOLD' : 'BLUE',
+          tier: isDesigner ? 'BLUE' : 'GOLD',
           primaryBreedDNA: health.pDNA,
           secondaryBreedDNA: health.sDNA,
           healthStatus: health.status,
