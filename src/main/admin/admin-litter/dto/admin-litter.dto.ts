@@ -10,7 +10,10 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CanineStatus, RegistryTier } from 'generated/prisma/enums';
+import {
+  CanineStatus,
+  RegistryTier,
+} from '../../../../../generated/prisma/enums';
 
 export class AdminLitterQueryDto {
   @ApiPropertyOptional({ example: 1 })

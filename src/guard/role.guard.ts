@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
@@ -8,9 +10,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from 'src/main/prisma/prisma.service';
-import { RoleType, UserStatus } from 'generated/prisma/enums';
-import { ROLES_KEY } from 'src/decorator/roles.decorator';
+import { RoleType, UserStatus } from '../../generated/prisma/enums';
+import { PrismaService } from '../main/prisma/prisma.service';
+import { ROLES_KEY } from '../decorator/roles.decorator';
 
 @Injectable()
 export class RoleGuard implements CanActivate {

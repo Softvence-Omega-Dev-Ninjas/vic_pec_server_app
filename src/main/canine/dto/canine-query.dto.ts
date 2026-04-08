@@ -12,7 +12,7 @@ import {
   Gender,
   RegistryTier,
   CertificateRequestStatus,
-} from 'generated/prisma/enums';
+} from '../../../../generated/prisma/enums';
 
 export class CanineQueryDto {
   @ApiPropertyOptional({ example: 1 })

@@ -9,15 +9,12 @@ import {
   BadRequestException,
   Logger, // 1. Added Logger
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
+// import { PrismaService } from '../main/prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { PaginationDto, RevenueFilterDto } from './dto/PaginationDto';
-import {
-  // CanineStatus,
-  // ServiceType,
-  SubscriptionStatus,
-} from 'generated/prisma/enums';
+import { PrismaService } from '../prisma/prisma.service';
+import { SubscriptionStatus } from '../../../generated/prisma/enums';
 
 export const PLAN_ORDER = {
   FOUNDATIONAL: 1,

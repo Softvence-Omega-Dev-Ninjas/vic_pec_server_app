@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
   Controller,
@@ -13,17 +14,16 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { MembershipPlanService } from './membership-plan.service';
 
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-// import { RoleGuard } from 'src/guard/role.guard';
-import { Roles } from 'src/decorator/roles.decorator';
-import { ResourceType, RoleType } from 'generated/prisma/enums';
+import { ResourceType, RoleType } from '../../../../generated/prisma/enums';
 import {
   CreateMembershipDto,
   UpdateMembershipDto,
 } from './dto/create-membership-plan.dto';
-import { PermissionGuard } from 'src/guard/permission.guard';
-import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
 import { PermissionAction } from '../permission/permission.service';
+import { JwtAuthGuard } from '../../../guard/jwt.auth.guard';
+import { PermissionGuard } from '../../../guard/permission.guard';
+import { CheckPermission } from '../../../decorator/CheckPermission.decorator';
+import { Roles } from '../../../decorator/roles.decorator';
 
 @ApiTags('Admin Membership Management')
 @ApiBearerAuth()

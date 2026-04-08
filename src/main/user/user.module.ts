@@ -6,9 +6,9 @@ import { JwtStrategy } from './jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserProfileController } from './profile/user-profile.controller';
 import { UserProfileService } from './profile/user-profile.service';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { NotificationsService } from 'src/notifications/notifications.service';
-import { NotificationsGateway } from 'src/notifications/notifications.gateway';
+import { CloudinaryService } from '../../cloudinary/cloudinary.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { NotificationsGateway } from '../../notifications/notifications.gateway';
 
 @Module({
   providers: [

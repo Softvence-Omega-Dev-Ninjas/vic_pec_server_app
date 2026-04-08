@@ -10,7 +10,11 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Gender, RegistryTier, CanineStatus } from 'generated/prisma/enums';
+import {
+  CanineStatus,
+  Gender,
+  RegistryTier,
+} from '../../../../../generated/prisma/enums';
 
 export class AdminCanineQueryDto {
   @ApiPropertyOptional({ example: 1 })

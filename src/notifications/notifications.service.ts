@@ -9,12 +9,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { NotificationsGateway } from './notifications.gateway';
-import { PrismaService } from 'src/main/prisma/prisma.service';
+import { PrismaService } from '../main/prisma/prisma.service';
 import {
   QueryNotificationDto,
   MarkSelectedReadDto,
 } from './dto/notification.dto';
-import { RoleType, ResourceType } from 'generated/prisma/enums';
+import { RoleType, ResourceType } from '../../generated/prisma/enums';
 
 @Injectable()
 export class NotificationsService {

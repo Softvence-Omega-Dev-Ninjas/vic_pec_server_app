@@ -10,10 +10,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { RoleType, UserStatus } from 'generated/prisma/enums';
-import { MailService } from 'src/main/mail/mail.service';
-import { PrismaService } from 'src/main/prisma/prisma.service';
+import { RoleType, UserStatus } from '../../../../generated/prisma/enums';
+
 import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../mail/mail.service';
 
 @Injectable()
 export class AdminUserService {

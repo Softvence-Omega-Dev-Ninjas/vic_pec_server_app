@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
@@ -13,14 +14,13 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
-// import { CloudinaryService } from 'src/common/cloudinary/cloudinary.service';
 import { CreateLitterDto, UpdateLitterDto } from './dto/create-litter.dto';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { LitterQueryDto } from './dto/LitterQueryDto';
-// import { RegistryTier, ResourceType } from 'generated/prisma/enums';
-import { NotificationsService } from 'src/notifications/notifications.service';
+
 import { PaymentService } from '../payment/payment.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CloudinaryService } from '../../cloudinary/cloudinary.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 @Injectable()
 export class LitterService {
@@ -33,7 +33,11 @@ export class LitterService {
     private readonly paymentService: PaymentService,
   ) {}
 
-  private async getNextPcrId(kind: string, prefix: string, breedCode: string): Promise<string> {
+  private async getNextPcrId(
+    kind: string,
+    prefix: string,
+    breedCode: string,
+  ): Promise<string> {
     const sequence = await this.prisma.pcrSequence.upsert({
       where: { kind_prefix_breedCode: { kind, prefix, breedCode } },
       update: { lastValue: { increment: 1 } },
@@ -42,14 +46,19 @@ export class LitterService {
     return sequence.lastValue.toString().padStart(5, '0');
   }
 
-  private async getNextPcrIdMany(kind: string, prefix: string, breedCode: string, count: number): Promise<string[]> {
+  private async getNextPcrIdMany(
+    kind: string,
+    prefix: string,
+    breedCode: string,
+    count: number,
+  ): Promise<string[]> {
     if (count <= 0) return [];
     const sequence = await this.prisma.pcrSequence.upsert({
       where: { kind_prefix_breedCode: { kind, prefix, breedCode } },
       update: { lastValue: { increment: count } },
       create: { kind, prefix, breedCode, lastValue: count },
     });
-    
+
     const startValue = sequence.lastValue - count + 1;
     const ids: string[] = [];
     for (let i = 0; i < count; i++) {
@@ -207,7 +216,11 @@ export class LitterService {
     const pcrBreedCode = breed.breedCode;
 
     // Incremental logic using atomic sequence
-    const pcrIncremental = await this.getNextPcrId('LITTER', pcrPrefix, pcrBreedCode);
+    const pcrIncremental = await this.getNextPcrId(
+      'LITTER',
+      pcrPrefix,
+      pcrBreedCode,
+    );
     const pcrRandom = Math.floor(100000 + Math.random() * 900000).toString();
     const genPart = gen ? `-${gen}` : '';
 
@@ -253,15 +266,20 @@ export class LitterService {
     if (dto.puppies && Array.isArray(dto.puppies) && dto.puppies.length > 0) {
       const pupPrefix = breed.type === 'DESIGNER' ? 'B' : 'G';
       const pupCount = dto.puppies.length;
-      
+
       // Get all puppy sequence numbers in one query
-      const pupIncs = await this.getNextPcrIdMany('CANINE', pupPrefix, pcrBreedCode, pupCount);
-      
+      const pupIncs = await this.getNextPcrIdMany(
+        'CANINE',
+        pupPrefix,
+        pcrBreedCode,
+        pupCount,
+      );
+
       const puppiesData: any[] = [];
       const imageRecords: any[] = [];
       const dnaRecords: any[] = [];
 
-      // Import uuid or use random manually. We will use a random 32 char hex if uuid is unavailable, but usually crypto.randomUUID is best. 
+      // Import uuid or use random manually. We will use a random 32 char hex if uuid is unavailable, but usually crypto.randomUUID is best.
       // Prisma `createMany` allows explicit IDs, so we generate them to map images.
       const { v4: uuidv4 } = require('uuid');
 
@@ -300,15 +318,24 @@ export class LitterService {
 
         // Prepare relational assets for bulk insert
         imageUrls.forEach((url) => {
-          imageRecords.push({ url, publicId: url.split('/').pop(), canineId: pupId });
+          imageRecords.push({
+            url,
+            publicId: url.split('/').pop(),
+            canineId: pupId,
+          });
         });
         docUrls.forEach((url) => {
-          dnaRecords.push({ url, name: `${pup.name} DNA Record`, publicId: url.split('/').pop(), canineId: pupId });
+          dnaRecords.push({
+            url,
+            name: `${pup.name} DNA Record`,
+            publicId: url.split('/').pop(),
+            canineId: pupId,
+          });
         });
       }
 
       await tx.canine.createMany({ data: puppiesData });
-      
+
       if (imageRecords.length > 0) {
         await tx.image.createMany({ data: imageRecords });
       }

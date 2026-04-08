@@ -7,7 +7,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { RoleType } from 'generated/prisma/enums';
+import { RoleType } from '../../../../../generated/prisma/enums';
 
 export class CreateUserByAdminDto {
   @ApiProperty({ example: 'user@example.com' })

@@ -7,7 +7,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ResourceType } from 'generated/prisma/enums';
+import { ResourceType } from '../../../generated/prisma/enums';
 
 export class CreateNotificationDto {
   receiverId!: string;

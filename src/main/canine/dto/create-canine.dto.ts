@@ -13,7 +13,7 @@ import {
   RegistrationRequestType,
   VaccinationType,
   HealthClearance,
-} from 'generated/prisma/enums';
+} from '../../../../generated/prisma/enums';
 import { PartialType } from '@nestjs/swagger';
 
 export class RegisterCanineDto {

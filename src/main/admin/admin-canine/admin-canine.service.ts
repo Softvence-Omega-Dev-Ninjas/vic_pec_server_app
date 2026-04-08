@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // admin-canine/admin-canine.service.ts
 import {
@@ -5,11 +7,12 @@ import {
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
+
 import {
   AdminCanineQueryDto,
   UpdateCanineAdminDto,
 } from './dto/admin-canine-query.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AdminCanineService {

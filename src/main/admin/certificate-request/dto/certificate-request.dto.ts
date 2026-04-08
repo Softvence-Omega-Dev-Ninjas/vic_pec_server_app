@@ -6,7 +6,7 @@ import {
   IsString,
   IsUUID,
 } from 'class-validator';
-import { CertificateRequestStatus } from 'generated/prisma/enums';
+import { CertificateRequestStatus } from '../../../../../generated/prisma/enums';
 
 export class CreateCertificateRequestDto {
   @ApiProperty({ example: 'canine-uuid-here', required: false })

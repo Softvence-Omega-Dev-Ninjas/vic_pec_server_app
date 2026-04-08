@@ -8,7 +8,6 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import {
   ChangePasswordDto,
@@ -16,8 +15,8 @@ import {
   UpdateSettingsDto,
 } from './dto/user-profile.dto';
 import { UserService } from '../user.service';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-// import { MailService } from 'src/main/mail/mail.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CloudinaryService } from '../../../cloudinary/cloudinary.service';
 
 @Injectable()
 export class UserProfileService {

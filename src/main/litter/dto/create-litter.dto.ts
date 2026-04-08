@@ -16,7 +16,7 @@ import {
   HealthClearance,
   RegistryTier,
   VaccinationType,
-} from 'generated/prisma/enums';
+} from '../../../../generated/prisma/enums';
 import { PartialType } from '@nestjs/swagger';
 
 export class PuppyDetailDto {

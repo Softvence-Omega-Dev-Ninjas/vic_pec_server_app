@@ -9,9 +9,9 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
-import { TransferOwnershipStatus } from 'generated/prisma/enums';
+import { TransferOwnershipStatus } from '../../../../generated/prisma/enums';
 import { TransferQueryDto } from './dto/TransferQueryDto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AdminOwnerTransferService {

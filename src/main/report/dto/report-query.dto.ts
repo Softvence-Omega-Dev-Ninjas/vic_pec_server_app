@@ -1,7 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsEnum, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ReportStatus, PriorityLevel } from 'generated/prisma/enums';
+import {
+  PriorityLevel,
+  ReportStatus,
+} from '../../../../generated/prisma/enums';
 
 export class ReportQueryDto {
   @ApiPropertyOptional({ example: 1 })

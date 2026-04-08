@@ -13,9 +13,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import Stripe from 'stripe';
-import { NotificationsService } from 'src/notifications/notifications.service';
-import { SubscriptionStatus } from 'generated/prisma/enums';
+import { SubscriptionStatus } from '../../../generated/prisma/enums';
 import { LitterService } from '../litter/litter.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 @Injectable()
 export class StripeWebhookService {

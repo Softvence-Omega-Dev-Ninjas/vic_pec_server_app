@@ -20,7 +20,7 @@ import {
   UpdateHealthRequestStatusDto,
 } from './dto/create-health-request.dto';
 import { RequestHealthReportService } from './request-helth-report.service';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+import { JwtAuthGuard } from '../../guard/jwt.auth.guard';
 
 @ApiTags('Health Access Requests')
 @ApiBearerAuth()

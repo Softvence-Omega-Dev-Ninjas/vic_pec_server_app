@@ -6,7 +6,7 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
+import { PrismaService } from '../main/prisma/prisma.service';
 
 @Injectable()
 export class MembershipLimitGuard implements CanActivate {

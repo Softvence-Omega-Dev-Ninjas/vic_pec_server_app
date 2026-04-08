@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEnum, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TransferOwnershipStatus } from 'generated/prisma/enums';
+import { TransferOwnershipStatus } from '../../../../../generated/prisma/enums';
 
 export class TransferQueryDto {
   @ApiPropertyOptional({ example: 1 })

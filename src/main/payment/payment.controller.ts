@@ -10,12 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+
 import { PaymentService } from './payment.service';
 import { CreateCheckoutDto } from '../admin/membership-plan/dto/create-checkout.dto';
-import { Roles } from 'src/decorator/roles.decorator';
-import { RoleType } from 'generated/prisma/enums';
+
+import { RoleType } from '../../../generated/prisma/enums';
 import { PaginationDto, RevenueFilterDto } from './dto/PaginationDto';
+import { JwtAuthGuard } from '../../guard/jwt.auth.guard';
+import { Roles } from '../../decorator/roles.decorator';
 
 @ApiTags('Payments')
 @Controller('payments')

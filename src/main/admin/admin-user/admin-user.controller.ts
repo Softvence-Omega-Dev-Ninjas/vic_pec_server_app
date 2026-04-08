@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import {
   Controller,
@@ -19,11 +19,11 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Response } from 'express';
 import { AdminUserService } from './admin-user.service';
 import { CreateUserByAdminDto } from './dto/create-user-by-admin.dto';
-import { ResourceType, UserStatus } from 'generated/prisma/enums';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-import { PermissionGuard } from 'src/guard/permission.guard';
-import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
+import { ResourceType, UserStatus } from '../../../../generated/prisma/enums';
 import { PermissionAction } from '../permission/permission.service';
+import { JwtAuthGuard } from '../../../guard/jwt.auth.guard';
+import { PermissionGuard } from '../../../guard/permission.guard';
+import { CheckPermission } from '../../../decorator/CheckPermission.decorator';
 
 @UseGuards(JwtAuthGuard)
 @ApiTags('Admin / User Management')

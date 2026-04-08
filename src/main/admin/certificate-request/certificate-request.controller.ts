@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -16,16 +17,16 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-import { PermissionGuard } from 'src/guard/permission.guard';
-import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
-import { ResourceType } from 'generated/prisma/enums';
+import { ResourceType } from '../../../../generated/prisma/enums';
 import { PermissionAction } from '../permission/permission.service';
 import {
   CertificateQueryDto,
   CreateCertificateRequestDto,
 } from './dto/certificate-request.dto';
 import { CertificateRequestService } from './certificate-request.service';
+import { JwtAuthGuard } from '../../../guard/jwt.auth.guard';
+import { PermissionGuard } from '../../../guard/permission.guard';
+import { CheckPermission } from '../../../decorator/CheckPermission.decorator';
 
 @ApiTags('Certificate Management (User & Admin)')
 @ApiBearerAuth()

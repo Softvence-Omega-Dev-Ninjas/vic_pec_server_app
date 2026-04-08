@@ -11,15 +11,15 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminCanineService } from './admin-canine.service';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
-import { PermissionGuard } from 'src/guard/permission.guard';
-import { CheckPermission } from 'src/decorator/CheckPermission.decorator';
-import { ResourceType } from 'generated/prisma/enums';
+import { ResourceType } from '../../../../generated/prisma/enums';
 import { PermissionAction } from '../permission/permission.service';
 import {
   AdminCanineQueryDto,
   UpdateCanineAdminDto,
 } from './dto/admin-canine-query.dto';
+import { JwtAuthGuard } from '../../../guard/jwt.auth.guard';
+import { PermissionGuard } from '../../../guard/permission.guard';
+import { CheckPermission } from '../../../decorator/CheckPermission.decorator';
 
 @ApiTags('Admin / Canine Management')
 @ApiBearerAuth()

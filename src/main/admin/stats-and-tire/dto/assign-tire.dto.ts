@@ -1,10 +1,7 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // update-tier.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEnum, IsNotEmpty } from 'class-validator';
-import { RegistryTier } from 'generated/prisma/enums';
+import { RegistryTier } from '../../../../../generated/prisma/enums';
 
 export class UpdateRegistryTierDto {
   @ApiProperty({

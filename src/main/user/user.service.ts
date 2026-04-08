@@ -19,8 +19,8 @@ import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-otp.dto';
-import { ResourceType } from 'generated/prisma/enums';
-import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsService } from '../../notifications/notifications.service';
+import { ResourceType } from '../../../generated/prisma/enums';
 
 @Injectable()
 export class UserService {

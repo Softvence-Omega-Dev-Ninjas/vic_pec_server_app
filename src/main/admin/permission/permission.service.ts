@@ -9,10 +9,10 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
-import { ResourceType, RoleType } from 'generated/prisma/enums';
 import { PermissionDto } from './dto/permission.dto';
 import { PermissionPaginationDto } from './dto/permission-query.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ResourceType, RoleType } from '../../../../generated/prisma/enums';
 
 export enum PermissionAction {
   VIEW = 'canView',

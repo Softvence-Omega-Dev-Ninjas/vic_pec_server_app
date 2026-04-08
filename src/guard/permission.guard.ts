@@ -9,11 +9,11 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import {
-  PermissionService,
   PermissionAction,
-} from 'src/main/admin/permission/permission.service';
-import { PrismaService } from 'src/main/prisma/prisma.service';
-import { ResourceType } from 'generated/prisma/enums';
+  PermissionService,
+} from '../main/admin/permission/permission.service';
+import { PrismaService } from '../main/prisma/prisma.service';
+import { ResourceType } from '../../generated/prisma/enums';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {

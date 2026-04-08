@@ -1,8 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable } from '@nestjs/common';
-import { SubscriptionStatus } from 'generated/prisma/enums';
-import { PrismaService } from 'src/main/prisma/prisma.service';
+import { SubscriptionStatus } from '../../../generated/prisma/enums';
+import { PrismaService } from '../../main/prisma/prisma.service';
 
 @Injectable()
 export class AdminStatsService {

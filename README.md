@@ -23,7 +23,17 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository for the Purebred Canine Registry (PCR) backend.
+
+## Documentation
+
+Comprehensive project documentation is available in the `docs/` directory:
+
+- [**Project Structure**](docs/structured.md): Directory and file organization.
+- [**API Routes**](docs/routes.md): List of major API endpoints and description.
+- [**Database Design**](docs/bddesign.md): Overview of Prisma models and relations.
+- [**Setup & Usage**](docs/install.use.md): Instructions for installation and running the server.
+- [**Architecture**](docs/architecture.md): High-level system design and technical choices.
 
 ## Project setup
 

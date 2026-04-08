@@ -6,7 +6,8 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
-import { ResourceType, RoleType } from 'generated/prisma/enums';
+import { ResourceType, RoleType } from '../../../generated/prisma/enums';
+
 // import { ResourceType, RoleType } from '@prisma/client';
 
 @Injectable()

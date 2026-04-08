@@ -4,12 +4,12 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/main/prisma/prisma.service';
 import {
   CreateHealthRequestDto,
   UpdateRequestStatusDto,
 } from './dto/create-health-request.dto';
-import { HealthRequestStatus } from 'generated/prisma/enums';
+import { PrismaService } from '../prisma/prisma.service';
+import { HealthRequestStatus } from '../../../generated/prisma/enums';
 
 @Injectable()
 export class RequestHealthReportService {

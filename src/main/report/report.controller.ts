@@ -24,11 +24,12 @@ import {
 } from '@nestjs/swagger';
 import { ReportService } from './report.service';
 import { CreateReportDto, UpdateReportStatusDto } from './dto/report.dto';
-import { RoleGuard } from 'src/guard/role.guard';
-import { Roles } from 'src/decorator/roles.decorator';
-import { RoleType } from 'generated/prisma/enums';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+
 import { ReportQueryDto } from './dto/report-query.dto';
+import { JwtAuthGuard } from '../../guard/jwt.auth.guard';
+import { RoleGuard } from '../../guard/role.guard';
+import { RoleType } from '../../../generated/prisma/enums';
+import { Roles } from '../../decorator/roles.decorator';
 
 @ApiTags('Report Management')
 @Controller('reports')

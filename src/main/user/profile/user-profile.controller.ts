@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
@@ -17,8 +18,9 @@ import {
   UpdateProfileDto,
   UpdateSettingsDto,
 } from './dto/user-profile.dto';
-import { JwtAuthGuard } from 'src/guard/jwt.auth.guard';
+
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard } from '../../../guard/jwt.auth.guard';
 
 @ApiTags('User Profile & Settings')
 @ApiBearerAuth()
