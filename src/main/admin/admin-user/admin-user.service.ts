@@ -173,7 +173,10 @@ export class AdminUserService {
     if (status) where.status = status;
     if (isVerified !== undefined) where.isVerified = isVerified;
     if (search) {
-      where.fullName = { contains: search, mode: 'insensitive' };
+      where.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { pcrId: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     const [total, users] = await Promise.all([

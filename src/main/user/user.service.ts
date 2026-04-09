@@ -21,6 +21,7 @@ import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-otp.dto';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { ResourceType } from '../../../generated/prisma/enums';
+import { GetAmbassadorsDto } from './dto/get-ambassadors.dto';
 
 @Injectable()
 export class UserService {
@@ -376,5 +377,58 @@ export class UserService {
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException('Error retrieving user profile');
     }
+  }
+
+  async getTotalPrestigeAmbassadors(query: GetAmbassadorsDto) {
+    const { page = 1, limit = 10, searchTerm } = query;
+    const skip = (page - 1) * limit;
+
+    // Filter: Prefix 'PA' mane tara Prestige Ambassador
+    const where: any = {
+      pcrPrefix: 'PA',
+    };
+
+    if (searchTerm) {
+      where.OR = [
+        { fullName: { contains: searchTerm, mode: 'insensitive' } },
+        { email: { contains: searchTerm, mode: 'insensitive' } },
+        { pcrId: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          pcrId: true,
+          pcrPrefix: true,
+          status: true,
+          roleType: true,
+          createdAt: true,
+          profileImage: true,
+          membership: {
+            select: { name: true, tier: true },
+          },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return {
+      success: true,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPage: Math.ceil(total / limit),
+      },
+      data,
+    };
   }
 }

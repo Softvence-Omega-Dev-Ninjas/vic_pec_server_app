@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -11,10 +10,14 @@ import {
 
 import { CreateCertificateRequestDto } from './dto/certificate-request.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PaymentService } from '../../payment/payment.service';
 
 @Injectable()
 export class CertificateRequestService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly paymentService: PaymentService,
+  ) {}
 
   // 1. Get All Requests with logic-based filtering and safe pagination
   async getAllRequests(query: any) {
@@ -139,79 +142,80 @@ export class CertificateRequestService {
     });
   }
 
-  // 5. User Side: Create Request with Validation
-  async createRequest(ownerId: string, dto: CreateCertificateRequestDto) {
-    // 1. Validate Target (Canine or Litter) Existence and Status
+  private async validateEligibility(
+    ownerId: string,
+    dto: CreateCertificateRequestDto,
+  ) {
     if (dto.canineId) {
       const canine = await this.prisma.canine.findUnique({
         where: { id: dto.canineId },
       });
-
-      if (!canine) {
-        throw new NotFoundException('Canine not found');
+      if (!canine || canine.status !== 'APPROVED') {
+        throw new BadRequestException('Canine not found or not yet approved');
       }
 
-      // Check if the Canine itself is approved/verified by admin first
-      if (canine.status !== 'APPROVED') {
-        throw new BadRequestException(
-          'Cannot request a certificate for a canine that is not yet approved',
-        );
-      }
-
-      // 2. Prevent Duplicate Pending/Approved Requests
-      const existingRequest = await this.prisma.certificateRequest.findFirst({
+      const existing = await this.prisma.certificateRequest.findFirst({
         where: {
           canineId: dto.canineId,
-          ownerId: ownerId,
+          ownerId,
           status: { in: ['PENDING', 'APPROVED'] },
         },
       });
-
-      if (existingRequest) {
-        if (existingRequest.status === 'PENDING') {
-          throw new BadRequestException('Your request is pending on review');
-        }
+      if (existing)
         throw new BadRequestException(
-          'A certificate has already been issued for this canine',
+          'Request already exists or certificate issued',
         );
-      }
     }
 
-    // Logic for Litter (If applicable)
     if (dto.litterId) {
       const litter = await this.prisma.litter.findUnique({
         where: { id: dto.litterId },
       });
       if (!litter || litter.status !== 'APPROVED') {
-        throw new BadRequestException('Litter not found or not approved');
-      }
-
-      const existingLitterRequest =
-        await this.prisma.certificateRequest.findFirst({
-          where: {
-            litterId: dto.litterId,
-            ownerId: ownerId,
-            status: 'PENDING',
-          },
-        });
-
-      if (existingLitterRequest) {
-        throw new BadRequestException(
-          'Your litter certificate request is pending on review',
-        );
+        throw new BadRequestException('Litter not found or not yet approved');
       }
     }
+  }
 
-    // 3. Generate Unique ID
+  // 5. User Side: Create Request with Validation
+  async createRequest(ownerId: string, dto: CreateCertificateRequestDto) {
+    await this.validateEligibility(ownerId, dto);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      include: { membership: { include: { servicePricings: true } } },
+    });
+
+    if (!user?.membership)
+      throw new BadRequestException('No active membership found');
+
+    const certPricing = user.membership.servicePricings.find(
+      (sp) => sp.serviceType === 'CERTIFICATE',
+    );
+    const basePrice = certPricing?.price || 0;
+    const discount = user.membership.certificateDiscount || 0;
+    const finalAmount = Math.round(basePrice * (1 - discount) * 100);
+
+    if (finalAmount <= 0) {
+      return await this.prisma.$transaction(async (tx) => {
+        return await this.executeRequestCreation(tx, ownerId, dto);
+      });
+    }
+
+    // method name matching: paymentService e createCertificateSession ache
+    return await this.paymentService.createCertificateSession(ownerId, dto);
+  }
+
+  // 2. Database logic (Webhook theke call hobe)
+  async executeRequestCreation(tx: any, ownerId: string, dto: any) {
     const generatedRequestId = `CERT-${Date.now().toString().slice(-6)}`;
 
-    // 4. Create the Request
-    return this.prisma.certificateRequest.create({
+    return await tx.certificateRequest.create({
       data: {
         requestId: generatedRequestId,
         ownerId,
-        canineId: dto.canineId,
-        litterId: dto.litterId,
+        canineId: dto.canineId || null,
+        litterId: dto.litterId || null,
         status: 'PENDING',
       },
     });

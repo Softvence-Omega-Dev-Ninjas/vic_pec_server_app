@@ -16,6 +16,7 @@ import Stripe from 'stripe';
 import { SubscriptionStatus } from '../../../generated/prisma/enums';
 import { LitterService } from '../litter/litter.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { CertificateRequestService } from '../admin/certificate-request/certificate-request.service';
 
 @Injectable()
 export class StripeWebhookService {
@@ -27,6 +28,7 @@ export class StripeWebhookService {
     private configService: ConfigService,
     private readonly notificationsService: NotificationsService,
     private readonly litterService: LitterService,
+    private readonly certService: CertificateRequestService,
   ) {
     this.stripe = new Stripe(this.configService.get('STRIPE_SECRET_KEY')!, {
       apiVersion: '2024-12-18.acacia' as any,
@@ -102,6 +104,11 @@ export class StripeWebhookService {
     // 2. Litter Registration Logic
     if (metadata?.type === 'LITTER_REGISTRATION') {
       await this.handleLitterPayment(session);
+      return;
+    }
+
+    if (metadata?.type === 'CERTIFICATE_ORDER') {
+      await this.handleCertificatePayment(session);
       return;
     }
 
@@ -234,6 +241,13 @@ export class StripeWebhookService {
           resourceId: newCanine.id,
         },
       });
+
+      await this.notificationsService.alertAdmins({
+        title: 'New Canine Paid',
+        message: `A new Canine "${newCanine.name}" has been registered via Stripe. PcrId: ${newCanine.pcrId}`,
+        category: 'CANINE',
+        sourceId: newCanine.id,
+      });
     });
   }
 
@@ -301,7 +315,7 @@ export class StripeWebhookService {
       // Alert admins
       await this.notificationsService.alertAdmins({
         title: 'New Litter Paid',
-        message: `A new litter "${newLitter.name}" has been registered via Stripe.`,
+        message: `A new litter "${newLitter.name}" has been registered via Stripe. PcrId: ${newLitter.pcrId}`,
         category: 'CANINE',
         sourceId: newLitter.id,
       });
@@ -343,5 +357,52 @@ export class StripeWebhookService {
       where: { stripeSubscriptionId: subId },
       data: { status: status },
     });
+  }
+
+  // stripe-webhook.service.ts-er bhitore (puro method)
+
+  private async handleCertificatePayment(session: Stripe.Checkout.Session) {
+    const userId = session.client_reference_id;
+    const meta = session.metadata;
+
+    if (!userId || !meta) return;
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Certificate Request record create kora
+        const newRequest = await this.certService.executeRequestCreation(
+          tx,
+          userId,
+          {
+            canineId: meta.canineId || null,
+            litterId: meta.litterId || null,
+          },
+        );
+
+        // Payment Transaction record save kora
+        await tx.transaction.create({
+          data: {
+            stripeSessionId: session.id,
+            userId,
+            serviceType: 'CERTIFICATE',
+            amount: session.amount_total ? session.amount_total / 100 : 0,
+            status: 'PAID',
+            resourceId: newRequest.id,
+          },
+        });
+
+        // Admin ke alert dewa
+        await this.notificationsService.alertAdmins({
+          title: 'New Certificate Request Paid',
+          message: `A user has paid for a certificate request (Id: ${newRequest.requestId}).`,
+          category: 'CERTIFICATE',
+          sourceId: newRequest.id,
+        });
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Certificate Payment Processing Failed: ${error.message}`,
+      );
+    }
   }
 }

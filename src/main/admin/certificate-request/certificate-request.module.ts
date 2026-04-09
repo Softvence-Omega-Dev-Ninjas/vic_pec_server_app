@@ -4,9 +4,15 @@ import { CertificateRequestController } from './certificate-request.controller';
 
 import { PermissionService } from '../permission/permission.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PaymentService } from '../../payment/payment.service';
 
 @Module({
-  providers: [CertificateRequestService, PrismaService, PermissionService],
+  providers: [
+    CertificateRequestService,
+    PrismaService,
+    PermissionService,
+    PaymentService,
+  ],
   controllers: [CertificateRequestController],
 })
 export class CertificateRequestModule {}

@@ -37,6 +37,7 @@ export class ReportController {
   constructor(private readonly reportService: ReportService) {}
 
   @Post('submit')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Submit a report against a canine or litter' })
   async submit(@Req() req: any, @Body() dto: CreateReportDto) {
     const userId = req.userId || null;

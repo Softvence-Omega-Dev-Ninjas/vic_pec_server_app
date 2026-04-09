@@ -12,6 +12,7 @@ import {
   Req,
   UnauthorizedException,
   Param,
+  Query,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/register-user.dto';
@@ -27,6 +28,7 @@ import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ResetPasswordDto } from './dto/reset-otp.dto';
 import { JwtAuthGuard } from '../../guard/jwt.auth.guard';
+import { GetAmbassadorsDto } from './dto/get-ambassadors.dto';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -124,5 +126,21 @@ export class UserController {
   @Get('profile/:userId')
   async getPublicProfile(@Param('userId') id: string) {
     return this.userService.getUserById(id);
+  }
+
+  @Get('prestige-ambassadors')
+  @UseGuards(JwtAuthGuard) // Jodi admin chara keu na dekhuk chao tahole admin guard add korte paro
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get total Prestige Ambassadors',
+    description:
+      'Retrieves a paginated list of users who have the PRESTIGE membership (pcrPrefix: PA).',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of ambassadors retrieved successfully.',
+  })
+  async getTotalPrestigeAmbassadors(@Query() query: GetAmbassadorsDto) {
+    return this.userService.getTotalPrestigeAmbassadors(query);
   }
 }

@@ -15,6 +15,7 @@ import Stripe from 'stripe';
 import { PaginationDto, RevenueFilterDto } from './dto/PaginationDto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionStatus } from '../../../generated/prisma/enums';
+import { CreateCertificateRequestDto } from '../admin/certificate-request/dto/certificate-request.dto';
 
 export const PLAN_ORDER = {
   FOUNDATIONAL: 1,
@@ -509,6 +510,52 @@ export class PaymentService {
       mode: 'payment',
       success_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=true`,
       cancel_url: `${this.configService.get('FRONTEND_URL')}/owner/dashboard?success=false`,
+    });
+
+    return { url: session.url };
+  }
+
+  async createCertificateSession(
+    userId: string,
+    dto: CreateCertificateRequestDto,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { membership: { include: { servicePricings: true } } },
+    });
+
+    if (!user?.membership)
+      throw new BadRequestException('Active membership required');
+
+    const certService = user.membership.servicePricings.find(
+      (sp) => sp.serviceType === 'CERTIFICATE',
+    );
+
+    const basePrice = certService?.price || 0;
+    const discount = user.membership.certificateDiscount || 0;
+    const finalPrice = Math.max(0, basePrice * (1 - discount));
+
+    const session = await this.stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      client_reference_id: userId,
+      metadata: {
+        type: 'CERTIFICATE_ORDER',
+        canineId: dto.canineId || '',
+        litterId: dto.litterId || '',
+      },
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: { name: `Official Certificate Request` },
+            unit_amount: Math.round(finalPrice * 100),
+          },
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${process.env.FRONTEND_URL}/owner/dashboard?success=true`,
+      cancel_url: `${process.env.FRONTEND_URL}/owner/dashboard?success=false`,
     });
 
     return { url: session.url };

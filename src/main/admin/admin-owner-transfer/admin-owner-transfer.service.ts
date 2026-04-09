@@ -25,7 +25,6 @@ export class AdminOwnerTransferService {
     const skip = (page - 1) * limit;
 
     const where: any = {
-      isVerified: true,
       ...(status && { status }),
       ...(search && {
         OR: [

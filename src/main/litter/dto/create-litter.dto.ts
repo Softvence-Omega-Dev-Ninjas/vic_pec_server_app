@@ -8,6 +8,8 @@ import {
   IsNumber,
   IsArray,
   ValidateNested,
+  IsNumberString,
+  Length,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -39,9 +41,13 @@ export class PuppyDetailDto {
   @IsNotEmpty()
   weight!: number;
 
-  @ApiPropertyOptional({ example: 'MC-999000111' })
+  @ApiPropertyOptional({
+    example: '123456789012345',
+    description: '15-digit microchip identification number',
+  })
   @IsOptional()
-  @IsString()
+  @IsNumberString({}, { message: 'Microchip ID must contain only numbers' })
+  @Length(15, 15, { message: 'Microchip ID must be exactly 15 digits long' })
   microchipId?: string;
 }
 

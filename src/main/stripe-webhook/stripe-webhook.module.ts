@@ -9,6 +9,7 @@ import { PaymentService } from '../payment/payment.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationsGateway } from '../../notifications/notifications.gateway';
 import { CloudinaryService } from '../../cloudinary/cloudinary.service';
+import { CertificateRequestService } from '../admin/certificate-request/certificate-request.service';
 
 @Module({
   providers: [
@@ -19,6 +20,7 @@ import { CloudinaryService } from '../../cloudinary/cloudinary.service';
     LitterService,
     CloudinaryService,
     PaymentService,
+    CertificateRequestService,
   ],
   controllers: [StripeWebhookController],
 })

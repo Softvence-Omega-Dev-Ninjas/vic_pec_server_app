@@ -129,6 +129,7 @@ export class LitterService {
     // 4. Beyond F2 and F1B (Verified Designer Lineage)
     return 'VD';
   }
+
   async createLitter(
     userId: string,
     dto: CreateLitterDto,
